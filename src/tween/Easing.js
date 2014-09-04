@@ -561,3 +561,5 @@ Phaser.Easing = {
     }
 
 };
+
+Phaser.DefaultEasing = Phaser.Easing.Linear.None;

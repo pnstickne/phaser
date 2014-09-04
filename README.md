@@ -106,6 +106,8 @@ Version 2.1.0 - "Cairhien" - -in development-
 * ArcadePhysics.collide and overlap can now accept 2 Arrays of objects to be used in the collision checks (thanks @ctmartinez1992 #1158)
 * RetroFont has a new property called frameData which contains the Frame objects for each of the letters in the font, which can be used by Sprites.
 * Phaser.Canvas.setImageRenderingCrisp now sets `image-rendering: pixelated`, perfect for pixel art, which is now supported in Chrome 38.
+* There is a new Phaser.DefaultEasing property, which defaults to Phaser.Easing.Linear.None.
+You can leave it as is, a shorter way of specifying no ease, or change it and use it as a shortcut to your favourite easing function.
 
 ### Updates
 
