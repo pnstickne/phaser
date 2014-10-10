@@ -5,13 +5,15 @@
 */
 
 /**
-* A Tilemap Layer is a set of map data combined with a Tileset in order to render that data to the game.
+* A TilemapLayer is a Phaser.Image/Sprite that renders a specific TileLayer of a Tilemap.
+*
+* Since a TilemapLayer is a Sprite it can be moved around the display, added to other groups or display objects, etc.
 *
 * @class Phaser.TilemapLayer
 * @constructor
 * @param {Phaser.Game} game - Game reference to the currently running game.
 * @param {Phaser.Tilemap} tilemap - The tilemap to which this layer belongs.
-* @param {number} index - The layer index within the map that this TilemapLayer represents.
+* @param {integer} index - The index of the TileLayer to render within the Tilemap.
 * @param {number} width - Width of the renderable area of the layer.
 * @param {number} height - Height of the renderable area of the layer.
 */
@@ -28,14 +30,15 @@ Phaser.TilemapLayer = function (game, tilemap, index, width, height) {
     this.map = tilemap;
 
     /**
-    * @property {number} index - The index of this layer within the Tilemap.
-    */
-    this.index = index;
-
-    /**
     * @property {object} layer - The layer object within the Tilemap that this layer represents.
     */
     this.layer = tilemap.layers[index];
+
+    /**
+    * @property {integer} _layerChangeCount - Used to track layer/render update requirements.
+    * @private
+    */
+    this._layerChangeCount = -1;
 
     /**
     * @property {HTMLCanvasElement} canvas - The canvas to which this TilemapLayer draws.
@@ -157,10 +160,11 @@ Phaser.TilemapLayer = function (game, tilemap, index, width, height) {
     this.rayStepRate = 4;
 
     /**
-    * @property {boolean} wrap - Flag controlling if the layer tiles wrap at the edges. Only works if the World size matches the Map size.
+    * @property {boolean} _wrap - Flag controlling if the layer tiles wrap at the edges.
     * @default false
+    * @private
     */
-    this.wrap = false;
+    this._wrap = false;
 
     /**
     * @property {object} _mc - Local map data and calculation cache.
@@ -203,6 +207,31 @@ Phaser.TilemapLayer = function (game, tilemap, index, width, height) {
 
 Phaser.TilemapLayer.prototype = Object.create(Phaser.Image.prototype);
 Phaser.TilemapLayer.prototype.constructor = Phaser.TilemapLayer;
+
+/**
+* @property {integer} index - The index of this layer within the Tilemap.
+* @deprecated Use `layerIndex`.
+* @readonly
+*/
+Object.defineProperty(Phaser.TilemapLayer.prototype, 'index', {
+
+    get: function () {
+        return this.layer.layerIndex;
+    }
+
+});
+
+/**
+* @property {integer} layerIndex - The index of this layer within the Tilemap.
+* @readonly
+*/
+Object.defineProperty(Phaser.TilemapLayer.prototype, 'layerIndex', {
+
+    get: function () {
+        return this.layer.layerIndex;
+    }
+
+});
 
 /**
 * Automatically called by World.postUpdate. Handles cache updates.
@@ -469,24 +498,21 @@ Phaser.TilemapLayer.prototype.getTiles = function (x, y, width, height, collides
     this._mc.tw = (this.game.math.snapToCeil(width, this._mc.cw) + this._mc.cw) / this._mc.cw;
     this._mc.th = (this.game.math.snapToCeil(height, this._mc.ch) + this._mc.ch) / this._mc.ch;
 
-    //  This should apply the layer x/y here
-    this._results.length = 0;
-
-    for (var wy = this._mc.ty; wy < this._mc.ty + this._mc.th; wy++)
+    var acceptMask = 0xff;
+    if (collides || interestingFace)
     {
-        for (var wx = this._mc.tx; wx < this._mc.tx + this._mc.tw; wx++)
-        {
-            if (this.layer.data[wy] && this.layer.data[wy][wx])
-            {
-                if ((!collides && !interestingFace) || this.layer.data[wy][wx].isInteresting(collides, interestingFace))
-                {
-                    this._results.push(this.layer.data[wy][wx]);
-                }
-            }
+        acceptMask = 0;
+        if (collides) {
+            acceptMask |= 0x0f;
+        }
+        if (interestingFace) {
+            acceptMask |= 0xf0;
         }
     }
 
-    return this._results;
+    return this.layer.getExistingTiles(
+        this._mc.tx, this._mc.ty, this._mc.tw, this._mc.th,
+        acceptMask, 0, this._results);
 
 };
 
@@ -500,9 +526,33 @@ Phaser.TilemapLayer.prototype.updateMax = function () {
     this._mc.maxX = this.game.math.ceil(this.canvas.width / this.map.tileWidth) + 1;
     this._mc.maxY = this.game.math.ceil(this.canvas.height / this.map.tileHeight) + 1;
 
+    //  Don't let values reflect out-of-bounds if not wrapping
+    if (!this._wrap)
+    {
+        this._mc.maxX = Phaser.Math.clamp(this._mc.maxX, 0, this.layer.width);
+        this._mc.maxY = Phaser.Math.clamp(this._mc.maxY, 0, this.layer.height);
+    }
+
     this.dirty = true;
 
 };
+
+/**
+* @property {boolean} wrap - Flag controlling if the layer tiles wrap at the edges. Only works if the World size matches the Map size.
+* @default false
+*/
+Object.defineProperty(Phaser.TilemapLayer.prototype, "wrap", {
+
+    get: function () {
+        return this._wrap;
+    },
+
+    set: function (value) {
+        this._wrap = value;
+        this.updateMax();
+    }
+
+});
 
 /**
 * Renders the tiles to the layer canvas and pushes to the display.
@@ -511,8 +561,9 @@ Phaser.TilemapLayer.prototype.updateMax = function () {
 */
 Phaser.TilemapLayer.prototype.render = function () {
 
-    if (this.layer.dirty)
+    if (this.layer.changeCount > this._layerChangeCount)
     {
+        this._layerChangeCount = this.layer.changeCount;
         this.dirty = true;
     }
 
@@ -524,8 +575,9 @@ Phaser.TilemapLayer.prototype.render = function () {
     this._mc.prevX = this._mc.dx;
     this._mc.prevY = this._mc.dy;
 
-    this._mc.dx = -(this._mc.x - (this._mc.startX * this.map.tileWidth));
-    this._mc.dy = -(this._mc.y - (this._mc.startY * this.map.tileHeight));
+    //  Force dx/dy to integers; subsequent math guaranteed integers
+    this._mc.dx = -((this._mc.x - (this._mc.startX * this.map.tileWidth)) | 0);
+    this._mc.dy = -((this._mc.y - (this._mc.startY * this.map.tileHeight)) | 0);
 
     this._mc.tx = this._mc.dx;
     this._mc.ty = this._mc.dy;
@@ -534,8 +586,13 @@ Phaser.TilemapLayer.prototype.render = function () {
 
     this.context.fillStyle = this.tileColor;
 
-    var tile;
+    var width = this.layer.width;
+    var height = this.layer.height;
+    var tileWidth = this.layer.tileWidth | 0;
+    var tileHeight = this.layer.tileHeight | 0;
+
     var set;
+    var lastIndex = null;
 
     if (this.debug)
     {
@@ -544,66 +601,69 @@ Phaser.TilemapLayer.prototype.render = function () {
 
     for (var y = this._mc.startY, lenY = this._mc.startY + this._mc.maxY; y < lenY; y++)
     {
-        this._column = null;
+        var ty = y;
 
-        if (y < 0 && this.wrap)
+        if (y < 0 && this._wrap)
         {
-            this._column = this.layer.data[y + this.map.height];
+            ty = y + height;
         }
-        else if (y >= this.map.height && this.wrap)
+        else if (y >= height && this._wrap)
         {
-            this._column = this.layer.data[y - this.map.height];
-        }
-        else if (this.layer.data[y])
-        {
-            this._column = this.layer.data[y];
+            ty = y - height;
         }
 
-        if (this._column)
+        this._column = this.layer.data[ty];
+
+        for (var x = this._mc.startX, lenX = this._mc.startX + this._mc.maxX;
+            x < lenX;
+            x++, this._mc.tx += tileWidth)
         {
-            for (var x = this._mc.startX, lenX = this._mc.startX + this._mc.maxX; x < lenX; x++)
+            var tx = x;
+
+            if (x < 0 && this._wrap)
             {
-                var tile = null;
-
-                if (x < 0 && this.wrap)
-                {
-                    tile = this._column[x + this.map.width];
-                }
-                else if (x >= this.map.width && this.wrap)
-                {
-                    tile = this._column[x - this.map.width];
-                }
-                else if (this._column[x])
-                {
-                    tile = this._column[x];
-                }
-
-                if (tile && tile.index > -1)
-                {
-                    set = this.map.tilesets[this.map.tiles[tile.index][2]];
-
-                    if (this.debug === false && tile.alpha !== this.context.globalAlpha)
-                    {
-                        this.context.globalAlpha = tile.alpha;
-                    }
-
-                    set.draw(this.context, Math.floor(this._mc.tx), Math.floor(this._mc.ty), tile.index);
-
-                    if (tile.debug)
-                    {
-                        this.context.fillStyle = 'rgba(0, 255, 0, 0.4)';
-                        this.context.fillRect(Math.floor(this._mc.tx), Math.floor(this._mc.ty), this.map.tileWidth, this.map.tileHeight);
-                    }
-                }
-
-                this._mc.tx += this.map.tileWidth;
-
+                tx += width;
+            }
+            else if (x >= width && this._wrap)
+            {
+                tx -= width;
             }
 
+            var tile = this._column[tx];
+            if (!tile)
+            {
+                continue;
+            }
+            var index = tile.tileIndex;
+
+            //  index/type=0 is never rendered even though it "exists" in the layer
+            if (index > 0)
+            {
+                if (index !== lastIndex)
+                {
+                    set = this.map.tilesets[this.map.tiles[index][2]];
+                    lastIndex = index;
+                }
+
+                if (!this.debug)
+                {
+                    this.context.globalAlpha = tile.alpha;
+                }
+
+                set.draw(this.context, this._mc.tx, this._mc.ty, index);
+
+                // Tile doesn't have a debug.. (changed to this.debug)
+                if (this.debug)
+                {
+                    this.context.fillStyle = 'rgba(0, 255, 0, 0.4)';
+                    this.context.fillRect(this._mc.tx, this._mc.ty, tileWidth, tileHeight);
+                }
+            }
+           
         }
 
         this._mc.tx = this._mc.dx;
-        this._mc.ty += this.map.tileHeight;
+        this._mc.ty += tileHeight;
 
     }
 
@@ -639,87 +699,90 @@ Phaser.TilemapLayer.prototype.renderDebug = function () {
     this.context.strokeStyle = this.debugColor;
     this.context.fillStyle = this.debugFillColor;
 
+    var width = this.layer.width;
+    var height = this.layer.height;
+    var tileWidth = this.layer.tileWidth | 0;
+    var tileHeight = this.layer.tileHeight | 0;
+
     for (var y = this._mc.startY, lenY = this._mc.startY + this._mc.maxY; y < lenY; y++)
     {
-        this._column = null;
+        var ty = y;
 
-        if (y < 0 && this.wrap)
+        if (y < 0 && this._wrap)
         {
-            this._column = this.layer.data[y + this.map.height];
+            ty = y + height;
         }
-        else if (y >= this.map.height && this.wrap)
+        else if (y >= height && this._wrap)
         {
-            this._column = this.layer.data[y - this.map.height];
-        }
-        else if (this.layer.data[y])
-        {
-            this._column = this.layer.data[y];
+            ty = y - height;
         }
 
-        if (this._column)
+        this._column = this.layer.data[ty];
+
+        for (var x = this._mc.startX, lenX = this._mc.startX + this._mc.maxX;
+            x < lenX;
+            x++, this._mc.tx += tileWidth)
         {
-            for (var x = this._mc.startX, lenX = this._mc.startX + this._mc.maxX; x < lenX; x++)
+            var tx = x;
+
+            if (x < 0 && this._wrap)
             {
-                var tile = null;
-
-                if (x < 0 && this.wrap)
-                {
-                    tile = this._column[x + this.map.width];
-                }
-                else if (x >= this.map.width && this.wrap)
-                {
-                    tile = this._column[x - this.map.width];
-                }
-                else if (this._column[x])
-                {
-                    tile = this._column[x];
-                }
-
-                if (tile && (tile.faceTop || tile.faceBottom || tile.faceLeft || tile.faceRight))
-                {
-                    this._mc.tx = Math.floor(this._mc.tx);
-
-                    if (this.debugFill)
-                    {
-                        this.context.fillRect(this._mc.tx, this._mc.ty, this._mc.cw, this._mc.ch);
-                    }
-
-                    this.context.beginPath();
-
-                    if (tile.faceTop)
-                    {
-                        this.context.moveTo(this._mc.tx, this._mc.ty);
-                        this.context.lineTo(this._mc.tx + this._mc.cw, this._mc.ty);
-                    }
-
-                    if (tile.faceBottom)
-                    {
-                        this.context.moveTo(this._mc.tx, this._mc.ty + this._mc.ch);
-                        this.context.lineTo(this._mc.tx + this._mc.cw, this._mc.ty + this._mc.ch);
-                    }
-
-                    if (tile.faceLeft)
-                    {
-                        this.context.moveTo(this._mc.tx, this._mc.ty);
-                        this.context.lineTo(this._mc.tx, this._mc.ty + this._mc.ch);
-                    }
-
-                    if (tile.faceRight)
-                    {
-                        this.context.moveTo(this._mc.tx + this._mc.cw, this._mc.ty);
-                        this.context.lineTo(this._mc.tx + this._mc.cw, this._mc.ty + this._mc.ch);
-                    }
-
-                    this.context.stroke();
-                }
-
-                this._mc.tx += this.map.tileWidth;
-
+                tx = x + width;
             }
+            else if (x >= width && this._wrap)
+            {
+                tx = x - width;
+            }
+
+            var tile = this._column[tx];
+            if (!tile)
+            {
+                continue;
+            }
+
+            var index = tile.tileIndex;
+
+            if (index > -1 && (tile.faceTop || tile.faceBottom || tile.faceLeft || tile.faceRight))
+            {
+
+                if (this.debugFill)
+                {
+                    this.context.fillRect(this._mc.tx, this._mc.ty, this._mc.cw, this._mc.ch);
+                }
+
+                this.context.beginPath();
+
+                if (tile.faceTop)
+                {
+                    this.context.moveTo(this._mc.tx, this._mc.ty);
+                    this.context.lineTo(this._mc.tx + this._mc.cw, this._mc.ty);
+                }
+
+                if (tile.faceBottom)
+                {
+                    this.context.moveTo(this._mc.tx, this._mc.ty + this._mc.ch);
+                    this.context.lineTo(this._mc.tx + this._mc.cw, this._mc.ty + this._mc.ch);
+                }
+
+                if (tile.faceLeft)
+                {
+                    this.context.moveTo(this._mc.tx, this._mc.ty);
+                    this.context.lineTo(this._mc.tx, this._mc.ty + this._mc.ch);
+                }
+
+                if (tile.faceRight)
+                {
+                    this.context.moveTo(this._mc.tx + this._mc.cw, this._mc.ty);
+                    this.context.lineTo(this._mc.tx + this._mc.cw, this._mc.ty + this._mc.ch);
+                }
+
+                this.context.stroke();
+            }
+
         }
 
         this._mc.tx = this._mc.dx;
-        this._mc.ty += this.map.tileHeight;
+        this._mc.ty += tileHeight;
 
     }
 

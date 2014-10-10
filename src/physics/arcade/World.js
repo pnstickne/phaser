@@ -720,6 +720,8 @@ Phaser.Physics.Arcade.prototype = {
             return;
         }
 
+        var layer = tilemapLayer.layer;
+
         this._mapData = tilemapLayer.getTiles(
             sprite.body.position.x - sprite.body.tilePadding.x,
             sprite.body.position.y - sprite.body.tilePadding.y,
@@ -738,7 +740,7 @@ Phaser.Physics.Arcade.prototype = {
             {
                 if (processCallback.call(callbackContext, sprite, this._mapData[i]))
                 {
-                    if (this.separateTile(i, sprite.body, this._mapData[i]))
+                    if (this.separateTile(i, sprite.body, this._mapData[i], layer))
                     {
                         this._total++;
 
@@ -751,7 +753,7 @@ Phaser.Physics.Arcade.prototype = {
             }
             else
             {
-                if (this.separateTile(i, sprite.body, this._mapData[i]))
+                if (this.separateTile(i, sprite.body, this._mapData[i], layer))
                 {
                     this._total++;
 
@@ -1129,12 +1131,13 @@ Phaser.Physics.Arcade.prototype = {
     * @method Phaser.Physics.Arcade#separateTile
     * @param {Phaser.Physics.Arcade.Body} body - The Body object to separate.
     * @param {Phaser.Tile} tile - The tile to collide against.
+    * @param {Phsaer.TileLayer} layer - The layer the tile belongs to.
     * @return {boolean} Returns true if the body was separated, otherwise false.
     */
-    separateTile: function (i, body, tile) {
+    separateTile: function (i, body, tile, layer) {
 
         //  We re-check for collision in case body was separated in a previous step
-        if (!body.enable || !tile.intersects(body.position.x, body.position.y, body.right, body.bottom))
+        if (!body.enable || !layer.intersectsCell(tile.x, tile.y, body.position.x, body.position.y, body.right, body.bottom))
         {
             //  no collision so bail out (separted in a previous step)
             return false;
@@ -1143,19 +1146,23 @@ Phaser.Physics.Arcade.prototype = {
         //  They overlap. Any custom callbacks?
 
         //  A local callback always takes priority over a layer level callback
-        if (tile.collisionCallback && !tile.collisionCallback.call(tile.collisionCallbackContext, body.sprite, tile))
+        if (tile.hasCollisionTest && !layer.doTileCollisionTest(tile, body.sprite))
         {
             //  If it returns true then we can carry on, otherwise we should abort.
             return false;
         }
-        else if (tile.layer.callbacks[tile.index] && !tile.layer.callbacks[tile.index].callback.call(tile.layer.callbacks[tile.index].callbackContext, body.sprite, tile))
+        else if (!layer.doTileIndexCollisionTest(tile, body.sprite))
         {
             //  If it returns true then we can carry on, otherwise we should abort.
             return false;
         }
 
+        //  These and the following conditional should likely be moved above the collision-test callbacks.
+        var faceTopBottom = tile.faceTop || tile.faceBottom;
+        var faceLeftRight = tile.faceLeft || tile.faceRight;
+
         //  We don't need to go any further if this tile doesn't actually separate
-        if (!tile.faceLeft && !tile.faceRight && !tile.faceTop && !tile.faceBottom)
+        if (!faceTopBottom && !faceLeftRight)
         {
             //   This could happen if the tile was meant to be collided with re: a callback, but otherwise isn't needed for separation
             return false;
@@ -1177,7 +1184,7 @@ Phaser.Physics.Arcade.prototype = {
             minY = -1;
         }
 
-        if (body.deltaX() !== 0 && body.deltaY() !== 0 && (tile.faceLeft || tile.faceRight) && (tile.faceTop || tile.faceBottom))
+        if (body.deltaX() !== 0 && body.deltaY() !== 0 && faceLeftRight && faceTopBottom)
         {
             //  We only need do this if both axis have checking faces AND we're moving in both directions
             minX = Math.min(Math.abs(body.position.x - tile.right), Math.abs(body.right - tile.left));
@@ -1186,7 +1193,7 @@ Phaser.Physics.Arcade.prototype = {
 
         if (minX < minY)
         {
-            if (tile.faceLeft || tile.faceRight)
+            if (faceLeftRight)
             {
                 ox = this.tileCheckX(body, tile);
 
@@ -1197,14 +1204,14 @@ Phaser.Physics.Arcade.prototype = {
                 }
             }
 
-            if (tile.faceTop || tile.faceBottom)
+            if (faceTopBottom)
             {
                 oy = this.tileCheckY(body, tile);
             }
         }
         else
         {
-            if (tile.faceTop || tile.faceBottom)
+            if (faceTopBottom)
             {
                 oy = this.tileCheckY(body, tile);
 
@@ -1215,7 +1222,7 @@ Phaser.Physics.Arcade.prototype = {
                 }
             }
 
-            if (tile.faceLeft || tile.faceRight)
+            if (faceLeftRight)
             {
                 ox = this.tileCheckX(body, tile);
             }
