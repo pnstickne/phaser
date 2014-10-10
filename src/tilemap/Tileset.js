@@ -116,6 +116,12 @@ Phaser.Tileset = function (name, firstgid, width, height, margin, spacing, prope
     */
     this.drawCoords = [];
 
+    /**
+    * @property {object[]} tileProperties - Properties associated with the given tile index/type BIASED by the firstgid. The objects are single-level key value pairs where both keys and values are strings.
+    * @protected
+    */
+    this.tileProperties = [];
+
 };
 
 Phaser.Tileset.prototype = {

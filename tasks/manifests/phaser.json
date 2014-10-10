@@ -2,4 +2,5 @@
     "src/Phaser.js",
     "src/polyfills.js",
     "src/utils/Utils.js"
+    "src/tilemap/TileLayer.js",
 ]
