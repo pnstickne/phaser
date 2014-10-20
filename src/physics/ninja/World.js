@@ -225,21 +225,15 @@ Phaser.Physics.Ninja.prototype = {
     * Clears all physics bodies from the given TilemapLayer that were created with `World.convertTilemap`.
     *
     * @method Phaser.Physics.Ninja#clearTilemapLayerBodies
+    * @deprecated TileLayer has direct `removeBodies` support.
+    * @protected
     * @param {Phaser.Tilemap} map - The Tilemap to get the map data from.
     * @param {number|string|Phaser.TilemapLayer} [layer] - The layer to operate on. If not given will default to map.currentLayer.
     */
-    clearTilemapLayerBodies: function (map, layer) {
+    clearTilemapLayerBodies: function (map, layerKey) {
 
-        layer = map.getLayer(layer);
-
-        var i = map.layers[layer].bodies.length;
-
-        while (i--)
-        {
-            map.layers[layer].bodies[i].destroy();
-        }
-
-        map.layers[layer].bodies.length = [];
+        var layer = map.getTileLayer(layerKey);
+        layer.removeBodies(true);
 
     },
 
@@ -262,29 +256,30 @@ Phaser.Physics.Ninja.prototype = {
     * @param {object} [slopeMap] - The tilemap index to Tile ID map.
     * @return {array} An array of the Phaser.Physics.Ninja.Tile objects that were created.
     */
-    convertTilemap: function (map, layer, slopeMap) {
+    convertTilemap: function (map, layerKey, slopeMap) {
 
-        layer = map.getLayer(layer);
+        var layer = map.getTileLayer(layerKey);
 
-        //  If the bodies array is already populated we need to nuke it
-        this.clearTilemapLayerBodies(map, layer);
+        layer.removeBodies(true);
 
-        for (var y = 0, h = map.layers[layer].height; y < h; y++)
+        for (var y = 0, h = layer.height; y < h; y++)
         {
-            for (var x = 0, w = map.layers[layer].width; x < w; x++)
+            for (var x = 0, w = layer.width; x < w; x++)
             {
-                var tile = map.layers[layer].data[y][x];
+                var tile = layer.getTileRef(x, y);
 
                 if (tile && slopeMap.hasOwnProperty(tile.index))
                 {
-                    var body = new Phaser.Physics.Ninja.Body(this, null, 3, slopeMap[tile.index], 0, tile.worldX + tile.centerX, tile.worldY + tile.centerY, tile.width, tile.height);
+                    var tx = tile.worldX + (tile.width >> 1);
+                    var ty = tile.worldY + (tile.height >> 1);
+                    var body = new Phaser.Physics.Ninja.Body(this, null, 3, slopeMap[tile.index], 0, tx, ty, tile.width, tile.height);
 
-                    map.layers[layer].bodies.push(body);
+                    layer.bodies.push(body);
                 }
             }
         }
 
-        return map.layers[layer].bodies;
+        return layer.bodies;
 
     },
 

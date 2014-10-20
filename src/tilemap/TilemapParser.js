@@ -32,7 +32,7 @@ Phaser.TilemapParser = {
 
         if (typeof key === 'undefined')
         {
-            return this.getEmptyData();
+            return this.getEmptyData(0, 0, 0, 0);
         }
 
         if (key === null)
@@ -65,111 +65,69 @@ Phaser.TilemapParser = {
     *
     * @method Phaser.TilemapParser.parseCSV
     * @param {string} data - The CSV file data.
-    * @param {number} [tileWidth=32] - The pixel width of a single map tile. If using CSV data you must specify this. Not required if using Tiled map data.
-    * @param {number} [tileHeight=32] - The pixel height of a single map tile. If using CSV data you must specify this. Not required if using Tiled map data.
+    * @param {number} tileWidth - The pixel width of a single map tile.
+    * @param {number} tileHeight - The pixel height of a single map tile.
     * @return {object} Generated map data.
     */
     parseCSV: function (key, data, tileWidth, tileHeight) {
 
-        var map = this.getEmptyData();
-
-        //  Trim any rogue whitespace from the data
+        //  Trim any rogue whitespace from the (CSV) data
         data = data.trim();
 
-        var output = [];
         var rows = data.split("\n");
         var height = rows.length;
-        var width = 0;
+        var width = rows[0].split(",").length;
+
+        var map = this.getEmptyData(tileWidth, tileHeight, width, height);
+
+        map.format = Phaser.Tilemap.CSV;
+        map.name = key;
+
+        var layer = map.layers[0];
 
         for (var y = 0; y < rows.length; y++)
         {
-            output[y] = [];
-
             var column = rows[y].split(",");
 
             for (var x = 0; x < column.length; x++)
             {
                 var index = parseInt(column[x], 10);
-                output[y][x] = new Phaser.Tile(map.layers[0], index, x, y, tileWidth, tileHeight);
-            }
-
-            if (width === 0)
-            {
-                width = column.length;
+                if (index >= 0)  //  CSV-specific: Create/materialize tiles with index/type=0
+                {
+                    layer.setCell(x, y, index);
+                }
             }
         }
-
-        map.format = Phaser.Tilemap.CSV;
-        map.name = key;
-        map.width = width;
-        map.height = height;
-        map.tileWidth = tileWidth;
-        map.tileHeight = tileHeight;
-        map.widthInPixels = width * tileWidth;
-        map.heightInPixels = height * tileHeight;
-
-        map.layers[0].width = width;
-        map.layers[0].height = height;
-        map.layers[0].widthInPixels = map.widthInPixels;
-        map.layers[0].heightInPixels = map.heightInPixels;
-        map.layers[0].data = output;
 
         return map;
 
     },
 
     /**
-    * Returns an empty map data object.
+    * Returns an empty map data object with one unnamed layer.
     *
     * @method Phaser.TilemapParser.getEmptyData
+    * @private
     * @return {object} Generated map data.
     */
     getEmptyData: function (tileWidth, tileHeight, width, height) {
 
         var map = {};
 
-        map.width = 0;
-        map.height = 0;
-        map.tileWidth = 0;
-        map.tileHeight = 0;
-
-        if (typeof tileWidth !== 'undefined' && tileWidth !== null) { map.tileWidth = tileWidth; }
-        if (typeof tileHeight !== 'undefined' && tileHeight !== null) { map.tileHeight = tileHeight; }
-        if (typeof width !== 'undefined' && width !== null) { map.width = width; }
-        if (typeof height !== 'undefined' && height !== null) { map.height = height; }
+        map.width = width;
+        map.height = height;
+        map.tileWidth = tileWidth;
+        map.tileHeight = tileHeight;
 
         map.orientation = 'orthogonal';
         map.version = '1';
         map.properties = {};
-        map.widthInPixels = 0;
-        map.heightInPixels = 0;
+        map.widthInPixels = width * tileWidth;
+        map.heightInPixels = height * tileHeight;
 
-        var layers = [];
+        var layer = new Phaser.TileLayer(null, width, height, tileWidth, tileHeight);
 
-        var layer = {
-
-            name: 'layer',
-            x: 0,
-            y: 0,
-            width: 0,
-            height: 0,
-            widthInPixels: 0,
-            heightInPixels: 0,
-            alpha: 1,
-            visible: true,
-            properties: {},
-            indexes: [],
-            callbacks: [],
-            bodies: [],
-            data: []
-
-        };
-
-        //  fill with nulls?
-
-        layers.push(layer);
-
-        map.layers = layers;
+        map.layers = [layer];
         map.images = [];
         map.objects = {};
         map.collision = {};
@@ -227,10 +185,6 @@ Phaser.TilemapParser = {
             layer.y = json.layers[i].y;
             layer.alpha = json.layers[i].opacity;
             layer.visible = json.layers[i].visible;
-            layer.properties = {};
-            layer.indexes = [];
-            layer.callbacks = [];
-            layer.bodies = [];
 
             if (json.layers[i].properties)
             {
@@ -249,7 +203,7 @@ Phaser.TilemapParser = {
             for (var t = 0, len = json.layers[i].data.length; t < len; t++)
             {
                 var index = json.layers[i].data[t];
-                if (index > 0)
+                if (index > 0)  //  JSON-specific: Crate/materialize tiles with index/type=0
                 {
                     layer.setCell(x, y, index);
                 }
@@ -481,10 +435,6 @@ Phaser.TilemapParser = {
             }
 
         }
-
-        //  tile properties, which are really per index/type properties
-        //  are now handled by Tilemap.getPropertiesForTileIndex
-        //  and a (deprecated) proxy in Phaser.Tile.
 
         return map;
 

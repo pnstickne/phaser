@@ -5,19 +5,19 @@
 */
 
 /**
-* A Tile is a representation of a single tile within the Tilemap.
+* A Tile is a representation of a single cell/location within a Layer of a Tilemap.
 *
-* Tile objects represent a cell data (a single location) in a tile layer - BUT changes made to a specific Tile do NOT guaranteed automatically update the corresponding cell. The reliable manipulation/update of a Tile object can only be done through the cell/tile manipulation functions exposed by a Tilemap or TilemapLayer.
+* Changes made to a specific Tile do *not* automatically update the corresponding cell. The reliable manipulation/update of cells on a Layer can only be done through the cell/location manipulation functions (eg. {@link Phaser.TileLayer#setCellFromTile}, {@link Phaser.TileLayer#transformRegion}) exposed by a Tilemap or TilemapLayer.
 *
-* Do not add permantent ad-hoc properties. If any properties are added to a Tile object they may not be associated with future tile access. Use the `indexProperties` and `roleProperties` collection to add per-classification information.
+* Ad-hoc properties added to Tile objects are *not* garuanteed to persit across future tile access. Use `properties`, `indexProperties` and `roleProperties` to add the appropriate per-classification information.
 *
-* Tile objects should not be referenced for extended periods of time: a Tile should be considered only valid for the function in which it was obtained and when used with functions/code within that scope. In some cases Tile objects may be cached/reused; these should be appropriate documented.
+* *Tile objects should not be referenced/kept for extended periods of time:* a Tile should be considered only valid for the function in which it was obtained and when used with functions/code within that scope. Tile objects obtained *without* an explicit copy guarantee may be cached and reused.
 *
-* Various functionality has been deprecated in favor of more direct interactions with the appropriate Tilemap/TileLayer.
+* Previous Tile functionality has been deprecated in favor of more direct interactions with the appropriate Tilemap/TileLayer.
 *
 * @class Phaser.Tile
 * @constructor
-* @param {Phaser.TileLayer} layer - The layer this tile is associated with. Deprecated.
+* @param {Phaser.TileLayer} layer - The layer this tile is associated with.
 * @param {integer} tileIndex - The index/type of this tile in the core map data.
 * @param {integer} x - The x map coordinate component.
 * @param {integer} y - The y map coordinate component.
@@ -34,7 +34,7 @@ Phaser.Tile = function (layer, tileIndex, x, y) {
     this.layer = layer;
 
     /**
-    * The tile index/type.
+    * The tile index/type; -1 indicates the tile is "non-existant".
     *
     * @property {integer}
     * @protected
@@ -45,7 +45,7 @@ Phaser.Tile = function (layer, tileIndex, x, y) {
     this.tileIndex = tileIndex;
 
     /**
-    * The role ID; -1 indicates there is no role.
+    * The role ID; 0 indicates there is no role assigned.
     *
     * @member {integer}
     * @protected
@@ -53,7 +53,7 @@ Phaser.Tile = function (layer, tileIndex, x, y) {
     * @see #roleName
     */
     //  Modified internally
-    this.roleId = -1;
+    this.roleId = 0;
 
     /**
     * The x map coordinate component of the Tile.
@@ -61,7 +61,7 @@ Phaser.Tile = function (layer, tileIndex, x, y) {
     * @member {integer}
     * @readonly
     */
-    this.x = x;
+    this.x = x | 0;
 
     /**
     * The y map coordinate component of the Tile,
@@ -69,10 +69,10 @@ Phaser.Tile = function (layer, tileIndex, x, y) {
     * @member {integer}
     * @readonly
     */
-    this.y = y;
+    this.y = y | 0;
 
     /**
-    * Alpha value (in [0, 1]) at which this tile is drawn.
+    * Alpha value, in [0, 1], at which this tile is drawn. The alpha is only guaranteed to have a precision of 1/64.
     *
     * The TileLayer cell information is not guaranteed to be updated until the tile is set/updated.
     *
@@ -86,38 +86,17 @@ Phaser.Tile = function (layer, tileIndex, x, y) {
     * @member {integer}
     * @protected
     */
-    // 0x08 - collide up
-    // 0x04 - collide down
-    // 0x02 - collide left
-    // 0x01 - collide right
-    // 0x80 - face up
-    // 0x40 - face down
-    // 0x20 - face left
-    // 0x10 - face right
-    // 0x100 - has location-specific callback
+    // "Well Known"
+    //   0x08 - collide up
+    //   0x04 - collide down
+    //   0x02 - collide left
+    //   0x01 - collide right
+    //   0x80 - face up           ~ collide up << 4
+    //   0x40 - face down         ~ collide down << 4
+    //   0x20 - face left         ~ collide left << 4
+    //   0x10 - face right        ~ collide right << 4
+    // See constants for others
     this.tileFlags = 0;
-
-    /**
-    * Cached index properties
-    * @member {(object|null|undefined)}
-    * @private
-    */
-    this._indexProperties = undefined;
-
-    /**
-    * Cached role properties
-    * @member {(object|null|undefined)} 
-    * @private
-    */
-    this._roleProperties = undefined;
-
-    /**
-    * Cached collision callback
-    * @member {(object|null)}
-    * @private
-    */
-    // In the form [callback, context, ...args]
-    this._collisionTest = null;
 
 };
 
@@ -125,10 +104,10 @@ Phaser.Tile = function (layer, tileIndex, x, y) {
 * tileFlag Mask for colliding on all faces.
 *
 * @memberof Phaser.Tile
-* @constant {integer} COLLIDES_ALL
+* @constant {integer} COLLIDE_ALL
 * @protected
 */
-Phaser.Tile.COLLIDES_ALL = 0x0f;
+Phaser.Tile.COLLIDE_ALL = 0x0f;
 
 /*
 * Mask for tileFlags facing top or bottom
@@ -149,21 +128,23 @@ Phaser.Tile.FACE_LEFT_RIGHT = 0x20 | 0x10;
 * @constant
 * @protected
 */
-Phaser.Tile.FACE_ANY = Phaser.Tile.FACE_TOP_BOTTOM | Phaser.Tile.FACE_LEFT_RIGHT;
+Phaser.Tile.FACE_ALL = 0xf0;
 
 /*
-* Mask for tileFlags that has a tile-sppcific collision test.
+* Mask for tileFlags that has a tile/location-specific collision test.
+* This does not consider tile-index collisions.
 * @constant
 * @protected
 */
-Phaser.Tile.HAS_COLLISION_TEST = 0x100;
+Phaser.Tile.HAS_COLLISION_TEST = 0x1 << 8;
 
 /*
-* Mask for tileFlags - if the tile has a roleName assigned
+* Mask for tileFlags that has a tile/location-specific collision test.
+* This does not consider tile-index collisions.
 * @constant
 * @protected
 */
-Phaser.Tile.HAS_ROLE = 0x200;
+Phaser.Tile.DEBUG = 0x1 << 12;
 
 
 Phaser.Tile.prototype = {
@@ -171,26 +152,28 @@ Phaser.Tile.prototype = {
     /**
     * Check if the given render-relative coordinates fall within this tile.
     *
+    * @method
     * @param {number} rx - The render-relative x coordinate component (in pixels).
     * @param {number} ry - The render-relative y coordinate component (in pixels).
     * @return {boolean} True if the coordinates are within this Tile, otherwise false.
-    * @deprecated Use Phaser.TileLayer support directly.
+    * @deprecated Use {@link Phaser.TileLayer#cellContainsCoordinate} directly.
     */
     containsPoint: function (rx, ry) {
 
-        return this.layer.cellContainsPoint(this.x, this.y, rx, ry);
+        return this.layer.cellContainsCoordinate(this.x, this.y, rx, ry);
 
     },
 
     /**
     * Check for intersection with this tile.
     *
+    * @method
     * @param {number} left - The render-relative x/left edge (in pixels).
     * @param {number} top - The render-relative y/top edge (in pixels).
     * @param {number} right - The render-relative right edge (in pixels).
     * @param {number} bottom - The render-relative bottom edge (in pixels).
     * @return {boolean} True if any point of the tile is within the region.
-    * @deprecated Use Phaser.TileLayer support directly.
+    * @deprecated Use {@link Phaser.TileLayer#cellIntersectsBounds} directly.
     */
     intersects: function (left, top, right, bottom) {
 
@@ -199,31 +182,75 @@ Phaser.Tile.prototype = {
     },
 
     /**
-    * Set a callback to be called when this tile is hit by an object.
+    * Will "expand" this object.
+    * This is used to materialize additional members
+    * @method
+    * @private
+    */
+    _expand: function () {
+        if (this._expanded)
+        {
+            return;
+        }
+
+        this._expanded = true;
+        this._properties = undefined;
+        this._indexProperties = undefined;
+        this._roleProperties = undefined;
+        this._collisionTest = undefined;
+    },
+
+    /**
+    * Set a collision callback/test to be called when this tile is hit by an object.
     * The callback must return true for collision processing to take place.
     *
     * The cell information will not be updated until the tile is set/updated.
     *
+    * @method
     * @param {function} callback - Callback function. If null the callback is removed.
-    * @param {object} context - Callback will be called within this context.
-    * @param {...object} args - Additional arguments to pass.
+    * @param {object} [context=null] - Callback will be called within this context.
+    * @param {...object} [args=(none)] - Additional arguments to supply to the callback when it is invoked.
     */
-    setCollisionCallback: function (callback, context) {
+    setCollisionTest: function (callback, context) {
         
         if (callback)
         {
-            var args = [callback, context];
-            for (var i = 0, len = arguments.length; i < len; i++) {
-                args.push(arguments[i]);
+            var collisionTest = [callback, context || null];
+            for (var i = 2, len = arguments.length; i < len; i++) {
+                collisionTest.push(arguments[i]);
             }
 
+            this.setSharedCollisionTest(collisionTest);
+        }
+        else
+        {
+            this.setSharedCollisionTest(null);
+        }
+
+    },
+
+    /**
+    * This internal method allows a callback to be shared between many tiles - see {@link Phaser.Tile#setCollisionTest}.
+    *
+    * @method
+    * @protected
+    * @param {object[]} sharedCallback - The shared callback data; null if the callback is to be removed. This object must not be mutated after it is assigned and must be in the same format as generated within `setCollisionCallback`.
+    */
+    setSharedCollisionTest: function (collisionTest) {
+        
+        if (collisionTest)
+        {
+            this._expand();
             this.hasCollisionTest = true;
-            this._collisionTest = args;
+            this._collisionTest = collisionTest;
         }
         else
         {
             this.hasCollisionTest = false;
-            this._collisionTest = null;
+            if (this._expanded)
+            {
+                this._collisionTest = undefined;
+            }
         }
 
     },
@@ -231,24 +258,30 @@ Phaser.Tile.prototype = {
     /**
     * Reset internal state to that suitable of a non-existant cell.
     *
+    * @method
     * @protected
     */
     resetToNonExistant: function () {
 
         this.tileIndex = -1;
-        this.roleId = -1;
+        this.roleId = 0;
         this.tileFlags = 0;
         this.alpha = 1;
-        this._indexProperties = undefined;
-        this._roleProperties = undefined;
-        this._collisionTest = undefined;
+
+        if (this._expanded)
+        {
+            this._properties = undefined;
+            this._indexProperties = undefined;
+            this._roleProperties = undefined;
+            this._collisionTest = undefined;
+        }
 
     },
 
     /**
-    * Clean up memory.
+    * Clean up internal resources.
     *
-    * @deprecated This serves no useful role in context.
+    * @method
     */
     destroy: function () {
 
@@ -257,10 +290,11 @@ Phaser.Tile.prototype = {
     },
 
     /**
-    * Sets the collision flags for each side of this tile and updates the interesting faces list.
+    * Sets the collision flags for each side of this tile. A tile will only collide with an object moving from the side the collision is specified from.
     *
     * The cell information will not be updated until the tile is set/updated.
     *
+    * @method
     * @param {boolean} left - Indicating a collision with an object on the left.
     * @param {boolean} right - Indicating a collision with an object on the right.
     * @param {boolean} up - Indicating a collision with an object on the top.
@@ -274,7 +308,7 @@ Phaser.Tile.prototype = {
         if (left) { collisionFlags |= (0x02 | 0x20); }
         if (right) { collisionFlags |= (0x01 | 0x10); }
 
-        this.tileFlags &= ~0xFF;
+        this.tileFlags &= ~(Phaser.Tile.COLLIDE_ALL | Phaser.Tile.FACE_ALL);
         this.tileFlags |= collisionFlags;
 
     },
@@ -283,16 +317,19 @@ Phaser.Tile.prototype = {
     * Reset collision status flags.
     *
     * The cell information will not be updated until the tile is set/updated.
+    *
+    * @method
     */
     resetCollision: function () {
 
-        this.tileFlags &= ~0xFF;
+        this.tileFlags &= ~(Phaser.Tile.COLLIDE_ALL | Phaser.Tile.FACE_ALL);
 
     },
 
     /**
     * Is this tile interesting?
     *
+    * @method
     * @param {boolean} collides - If true will check for collisions / collide values.
     * @param {boolean} faces - If true will check for interesting faces.
     * @return {boolean} True if the Tile is interesting, otherwise false.
@@ -300,8 +337,8 @@ Phaser.Tile.prototype = {
     isInteresting: function (collides, faces) {
 
         return (
-            (collides && (this.tileFlags & 0x0F) !== 0) ||
-            (faces && (this.tileFlags & 0xF0) !== 0)
+            (collides && (this.tileFlags & Phaser.Tile.COLLIDE_ALL) !== 0) ||
+            (faces && (this.tileFlags & Phaser.Tile.FACE_ALL) !== 0)
         );
 
     },
@@ -311,6 +348,7 @@ Phaser.Tile.prototype = {
     *
     * If there is no collision handler then "pass" is returned; otherwise returns the value of invoking the callback (which may be null).
     *
+    * @method
     * @param {integer} x - The tile's x coordinate component.
     * @param {integer} y - The tile's y coordinate component.
     * @return The result of invoking the callback should it exist, else "pass".
@@ -340,13 +378,35 @@ Phaser.Tile.prototype = {
     },
 
     /**
-    * Perform a shallow-copy from the source tile data and properties to this tile.
+    * Perform a shallow-copy/clone.
+    *
+    * @method
+    * @protected
+    * @param {boolean} [disconnect=false] - If true then `properties` will be deep-copied.
+    * @return {Phaser.Tile} The new/cloned tile.
+    */
+    clone: function (disconnect) {
+
+        var tile = new Phaser.Tile(this.layer, -1, this.x, this.y);
+        tile.copyFrom(this, disconnect);
+        
+        return tile;
+
+    },
+
+    /**
+    * Perform a copy from the source tile data and properties to this tile.
+    * This does *not* the target tiles `x` or `y` location.
+    *
+    * Peforms a deep copy of the Tile `properties` if such is set and the location of the source tile and destination tile differ or if `disconnect` is specified. This is designed primarily to work with potential location-moving actions such as "copy & paste".
     *
     * The cell information will not be updated until the tile is set/updated.
     *
+    * @method
     * @param {Phaser.Tile} tile - The tile to copy from.
+    * @param {boolean} [disconnect=false] - If true then `properties` will be deep-copied.
     */
-    copyFrom: function (srcTile) {
+    copyFrom: function (srcTile, disconnect) {
 
         this.tileIndex = srcTile.tileIndex;
         this.roleId = srcTile.roleId;
@@ -354,23 +414,86 @@ Phaser.Tile.prototype = {
         this.alpha = srcTile.alpha;
         this.tileFlags = srcTile.tileFlags;
 
-        this._collisionTest = srcTile._collisionTest;
+        if (srcTile._expanded)
+        {
+            this._expand();
 
-        //  Carry cached values
-        this._indexProperties = srcTile._indexProperties;
-        this._roleProperties = srcTile._roleProperties;
+            if (srcTile._properties &&
+                (disconnect || this.x !== srcTile.x || this.y !== srcTile.y))
+            {
+                //  Deep-copy per-location propertiess if for a different location
+                this._properties = Phaser.Utils.extend(true, {}, srcTile._properties);
+            }
+            else
+            {
+                this._properties = srcTile._properties;
+            }
+
+            //  Carry cached values
+            this._indexProperties = srcTile._indexProperties;
+            this._roleProperties = srcTile._roleProperties;
+
+            this._collisionTest = srcTile._collisionTest;
+        }
 
     }
 
 };
 
+//  These following properties are, when set, added as a group to the actual tile.
+//  This reduces the object memory cost of these should-be-less-frequently
+//  use properties. See `_expand`. (In V8 this saves ~40 bytes/object.)
+
+/**
+* Track expanded state
+* @member {boolean}
+* @private
+*/
+Phaser.Tile.prototype._expanded = false;
+
+/**
+* Cell/location properties
+* @member {(object|undefined)}
+* @private
+*/
+Phaser.Tile.prototype._properties = undefined;
+
+/**
+* Cached index properties
+* @member {(object|null|undefined)}
+* @private
+*/
+Phaser.Tile.prototype._indexProperties = undefined;
+
+/**
+* Cached role properties
+* @member {(object|null|undefined)}
+* @private
+*/
+Phaser.Tile.prototype._roleProperties = undefined;
+
+/**
+* Cached collision callback
+* @member {(object|undefined)} - In the form of [callback, context, ...args]
+* @private
+*/
+Phaser.Tile.prototype._collisionTest = undefined;
+
 /**
 * Alias for `copyFrom`.
 *
-* @method Phaser.Tile#copy
+* @method
 * @deprecated Use `copyFrom`.
 */
 Phaser.Tile.prototype.copy  = Phaser.Tile.prototype.copyFrom;
+
+/**
+* Alias for `setCollisionTest`.
+*
+* @method
+* @deprecated Use `setCollisionTest`.
+*/
+Phaser.Tile.prototype.setCollisionCallback  = Phaser.Tile.prototype.setCollisionTest;
 
 Phaser.Tile.prototype.constructor = Phaser.Tile;
 
@@ -383,8 +506,8 @@ Phaser.Tile.prototype.constructor = Phaser.Tile;
 *
 * The TileLayer cell information is not guaranteed to be updated until the tile is set/updated.
 *
-* @memberof Phaser.Tile
 * @member {integer} #index
+* @memberof Phaser.Tile
 */
 Object.defineProperty(Phaser.Tile.prototype, "index", {
 
@@ -399,8 +522,11 @@ Object.defineProperty(Phaser.Tile.prototype, "index", {
         }
         else if (index !== this.tileIndex)
         {
-            this._indexProperties = undefined;
             this.tileIndex = index;
+            if (this._expanded)
+            {
+                this._indexProperties = undefined;
+            }
             this.layer.applyDefaultTileRules(this);
         }
     }
@@ -412,13 +538,13 @@ Object.defineProperty(Phaser.Tile.prototype, "index", {
 *
 * The TileLayer cell information is not guaranteed to be updated until the tile is set/updated.
 *
-* @memberof Phaser.Tile
 * @member {(string|null)} #roleName
+* @memberof Phaser.Tile
 */
 Object.defineProperty(Phaser.Tile.prototype, "roleName", {
 
     get: function () {
-        if (this.roleId >= 0)
+        if (this.roleId > 0)
         {
             var role = this.layer._roles[this.roleId];
             return (role && role.roleName) || null;
@@ -431,15 +557,15 @@ Object.defineProperty(Phaser.Tile.prototype, "roleName", {
         
         if (role)
         {
-            this.hasRole = true;
             this.roleId = role.roleId;
-            this._roleProperties = role.properties;
         }
         else
         {
-            this.hasRole = false;
-            this.roleId = -1;
-            this._roleProperties = undefined;
+            this.roleId = 0;
+            if (this._expanded)
+            {
+                this._roleProperties = undefined;
+            }
         }
     }
 
@@ -448,8 +574,8 @@ Object.defineProperty(Phaser.Tile.prototype, "roleName", {
 /**
 * Returns true if there is a tile-specific collision associated with this tile.
 *
-* @memberof Phaser.Tile
 * @member {boolean} #hasCollisionTest
+* @memberof Phaser.Tile
 * @readonly
 */
 Object.defineProperty(Phaser.Tile.prototype, "hasCollisionTest", {
@@ -466,50 +592,40 @@ Object.defineProperty(Phaser.Tile.prototype, "hasCollisionTest", {
 
 });
 
-
 /**
 * True if this Tile has a role.
 *
-* @memberof Phaser.Tile
 * @member {boolean} #hasRole
+* @memberof Phaser.Tile
 * @protected
 * @readonly
 */
 Object.defineProperty(Phaser.Tile.prototype, "hasRole", {
 
     get: function () {
-        return (this.tileFlags & Phaser.Tile.HAS_ROLE) !== 0;
-    },
-
-    //  "private"
-    set: function (value) {
-        if (value) { this.tileFlags |= Phaser.Tile.HAS_ROLE; }
-        else { this.tileFlags &= ~Phaser.Tile.HAS_ROLE; }
+        return this.roleId > 0;
     }
 
 });
 
-this.tileFlags |= Phaser.Tile.HAS_ROLE;
-
 /**
 * Tile-specific collision callback. Use setCollisionCallback to change. May be null.
-#
-* @memberof Phaser.Tile
+*
 * @member {(function|null)} #collisionCallback
+* @memberof Phaser.Tile
 * @protected
 * @readonly
-* @deprecated See Phaser.Tile#doTileCollisionTest
+* @deprecated Use {@link Phaser.Tile#doTileCollisionTest} instead.
 */
 Object.defineProperty(Phaser.Tile.prototype, "collisionCallback", {
 
     get: function () {
-        if ((this.tileFlags & Phaser.Tile.HAS_COLLISION_TEST) === 0)
+        if (!this._collisionTest)
         {
             return null;
         }
 
-        var handler = this._collisionTest;
-        return handler[0] || null;
+        return this._collisionTest[0] || null;
     }
 
 });
@@ -517,37 +633,36 @@ Object.defineProperty(Phaser.Tile.prototype, "collisionCallback", {
 /**
 * The context in which the collision callback will be called. Use setCollisionCallback to change. May be null.
 *
-* @memberof Phaser.Tile
 * @member {(object|null)} #collisionCallbackContext
+* @memberof Phaser.Tile
 * @protected
 * @readonly
-* @deprecated See Phaser.Tile.doTileCollisionTest
+* @deprecated Use {@link Phaser.Tile#doTileCollisionTest} instead.
 */
 Object.defineProperty(Phaser.Tile.prototype, "collisionCallbackContext", {
 
     get: function () {
-        if ((this.tileFlags & Phaser.Tile.HAS_COLLISION_TEST) === 0)
+        if (!this._collisionTest)
         {
             return null;
         }
 
-        var handler = this._collisionTest;
-        return handler[1] || null;
+        return this._collisionTest[1] || null;
     }
 
 });
 
 /**
-* True if this tile can collide on any of its faces.
+* True if this tile has any "collide" flags set.
 *
-* @memberof Phaser.Tile
 * @member {boolean} #collides
+* @memberof Phaser.Tile
 * @readonly
 */
 Object.defineProperty(Phaser.Tile.prototype, "collides", {
 
     get: function () {
-        return (this.tileFlags & 0x0F) !== 0;
+        return (this.tileFlags & 0x0f) !== 0;
     }
 
 });
@@ -555,47 +670,68 @@ Object.defineProperty(Phaser.Tile.prototype, "collides", {
 /**
 * True if this tile can collide on any of its faces or has a collision test callback set.
 *
-* @memberof Phaser.Tile
 * @member {boolean} #canCollide
+* @memberof Phaser.Tile
 * @readonly
 */
 Object.defineProperty(Phaser.Tile.prototype, "canCollide", {
 
     get: function () {
-        return (this.tileFlags & (0x0F | Phaser.Tile.HAS_COLLISION_TEST)) !== 0;
+        return (this.tileFlags & (0x0f | Phaser.Tile.HAS_COLLISION_TEST)) !== 0;
     }
 
 });
 
 /**
-* Like indexProperties; but creates new properties as required instead of returning null.
+* Returns true if this Tile has cell/location properties.
 *
+* @member {boolean} #hasProperties
 * @memberof Phaser.Tile
-* @member {object} #properties
-* @protected
 * @readonly
-* @deprecated Care should be used when accessing this property as it may accidently create new objects. See {@link Phaser.Tile#indexProperties indexProperties} as an alternative.
+*/
+Object.defineProperty(Phaser.Tile.prototype, "hasProperties", {
+
+    get: function () {
+        return !!this._properties;
+    }
+
+});
+
+/**
+* Custom properties for a *specific cell/location* within the Layer. This does *not* include per-index/type properties from Tiled data - see {@link Phaser.Tile#indexProperties}.
+*
+* Changing the returned object immediately affects the cell data - unless the `properties` have been explicltly disconnected by `copyFrom` or `clone`.
+*
+* Accessing this field creates new a properties object as required. Use `hasProperties` to check for existence of cell/location properties to avoid accidently creating new properties if not required.
+*
+* Custom types should *not* be added either directly or indirectly as some Tile operations may create a deep-clone of the `properties` object and custom types are not guaranteed to be correctly restored.
+*
+* @member {object} #properties
+* @memberof Phaser.Tile
+* @readonly
 */
 Object.defineProperty(Phaser.Tile.prototype, "properties", {
 
     get: function () {
-        if (this._indexProperties === undefined)
+        if (this._properties === undefined)
         {
-            this._indexProperties = this.layer.tilemap.gettileIndexProperties(this.tileIndex, true);
+            this._expand();
+            this._properties = {};
         }
-        return this._indexProperties;
+        return this._properties;
     }
 
 });
 
 /**
-* Additional properties for a tile index/type; returns null if there are no properties associated with the given index. Tile index/type properties are shared across the entire tilemap.
+* Additional properties for a *tile index/type*. Tile index/type properties are shared across the Layer or Tilemap depending on {@link Phaser.TileLayer#useLayerIndexProperties}.
 *
-* Modifying the returned object (if not null) modifies all shared index properties.
+* Changing the returned object immediately affects the shared tile index/type properties.
 *
-* @memberof Phaser.Tile
+* Returns null if the index is invalid or refers to a non-existant tile.
+*
 * @member {(object|null)} #indexProperties
-* @public
+* @memberof Phaser.Tile
 * @readonly
 */
 Object.defineProperty(Phaser.Tile.prototype, "indexProperties", {
@@ -603,7 +739,8 @@ Object.defineProperty(Phaser.Tile.prototype, "indexProperties", {
     get: function () {
         if (this._indexProperties === undefined)
         {
-            this._indexProperties = this.layer.tilemap.gettileIndexProperties(this.tileIndex, false);
+            this._expand();
+            this._indexProperties = this.layer.getTileIndexProperties(this.tileIndex, true);
         }
         return this._indexProperties;
     }
@@ -611,12 +748,14 @@ Object.defineProperty(Phaser.Tile.prototype, "indexProperties", {
 });
 
 /**
-* Additional properties for a named role; returns null if there are no properties associated with the given role name for this layer. See @{Link TileLayer.addRole}.
+* Additional properties for a *tile role*. Role properties are shared for all tiles with a particular role within the given Layer. See @{link Phaser.TileLayer#createTileRole} and @{link Phaser.Tile#roleName}.
 *
-* Modifying the returned object (if not null) modifies all shared role properties.
+* Changing the returned object immediately affects the shared tile index/type properties.
 *
-* @memberof Phaser.Tile
+* Returns null if the tile does not have an assigned role.
+*
 * @member {(object|null)} #roleProperties
+* @memberof Phaser.Tile
 * @readonly
 */
 Object.defineProperty(Phaser.Tile.prototype, "roleProperties", {
@@ -624,7 +763,8 @@ Object.defineProperty(Phaser.Tile.prototype, "roleProperties", {
     get: function () {
         if (this._roleProperties === undefined)
         {
-            this._roleProperties = this.layer.getRoleProperties(this.roleName);
+            this._expand();
+            this._roleProperties = this.layer.getRoleProperties(this.roleName, true);
         }
         return this._roleProperties;
     }
@@ -632,65 +772,80 @@ Object.defineProperty(Phaser.Tile.prototype, "roleProperties", {
 });
 
 /**
-* The world x value of the left (in pixels).
+* True if debugging is enabled for the tile; this normally means rendering is effected.
 *
+* @member {boolean} #debug
 * @memberof Phaser.Tile
+*/
+Object.defineProperty(Phaser.Tile.prototype, "debug", {
+
+    get: function () {
+        return (this.tileFlags & Phaser.Tile.DEBUG) !== 0;
+    },
+
+    set: function (value) {
+        if (value) { this.tileFlags |= Phaser.Tile.DEBUG; }
+        else { this.tileFlags &= ~Phaser.Tile.DEBUG; }
+    }
+
+});
+
+/**
+* Render-relative left edge (in pixels).
+*
 * @member {integer} #left
+* @memberof Phaser.Tile
 * @readonly
-* @deprecated Should use Tilemap/layer information when doing calculation. Also, just use `worldX` if required.
 */
 Object.defineProperty(Phaser.Tile.prototype, "left", {
 
     get: function () {
-        return this.worldX;
+        return this.x * this.layer.tileWidth;
     }
 
 });
 
 /**
-* The world x value of the right (in pixels).
+* Render-relative right edge (in pixels).
 *
-* @memberof Phaser.Tile
 * @member {integer} #right
+* @memberof Phaser.Tile
 * @readonly
-* @deprecated Should use Tilemap/layer information when doing calculation.
 */
 Object.defineProperty(Phaser.Tile.prototype, "right", {
 
     get: function () {
-        return this.worldX + this.width;
+        return (this.x + 1) * this.layer.tileWidth;
     }
 
 });
 
 /**
-* The world y value of the top (in pixels).
+* Render-relative top edge (in pixels).
 *
-* @memberof Phaser.Tile
 * @member {integer} #top
+* @memberof Phaser.Tile
 * @readonly
-* @deprecated Should use Tilemap/layer information when doing calculation. Also, just use `worldY` if required.
 */
 Object.defineProperty(Phaser.Tile.prototype, "top", {
 
     get: function () {
-        return this.worldY;
+        return this.y * this.layer.tileHeight;
     }
 
 });
 
 /**
-* The world y value of the bottom (in pixels).
+* Render-relative bottom edge (in pixels).
 *
-* @memberof Phaser.Tile
 * @member {integer} #bottom
+* @memberof Phaser.Tile
 * @readonly
-* @deprecated Should use Tilemap/layer information when doing calculation.
 */
 Object.defineProperty(Phaser.Tile.prototype, "bottom", {
 
     get: function () {
-        return this.worldY + this.height;
+        return (this.y + 1) * this.layer.tileHeight;
     }
 
 });
@@ -698,10 +853,9 @@ Object.defineProperty(Phaser.Tile.prototype, "bottom", {
 /**
 * Width of the tile (in pixels).
 *
-* @memberof Phaser.Tile
 * @member {integer} #width
+* @memberof Phaser.Tile
 * @readonly
-* @deprecated Should use Tilemap/layer information when doing calculation.
 */
 Object.defineProperty(Phaser.Tile.prototype, "width", {
 
@@ -714,12 +868,11 @@ Object.defineProperty(Phaser.Tile.prototype, "width", {
 /**
 * Height of the tile (in pixels).
 *
-* @memberof Phaser.Tile
 * @member {integer} #height
+* @memberof Phaser.Tile
 * @readonly
-* @deprecated Should use Tilemap/layer information when doing calculation.
 */
-Object.defineProperty(Phaser.Tile.prototype, "heigth", {
+Object.defineProperty(Phaser.Tile.prototype, "height", {
 
     get: function () {
         return this.layer.tileHeight;
@@ -730,15 +883,14 @@ Object.defineProperty(Phaser.Tile.prototype, "heigth", {
 /**
 * Render-relative x coordinate component (in pixels).
 *
-* @memberof Phaser.Tile
 * @member {integer} #worldX
+* @memberof Phaser.Tile
 * @readonly
-* @deprecated Should use Tilemap/layer information when doing calculation.
 */
 Object.defineProperty(Phaser.Tile.prototype, "worldX", {
 
     get: function () {
-        return (this.x * this.layer.tileWidth) | 0;
+        return this.x * this.layer.tileWidth;
     }
 
 });
@@ -746,15 +898,14 @@ Object.defineProperty(Phaser.Tile.prototype, "worldX", {
 /**
 * Render-relative y coordinate component (in pixels).
 *
-* @memberof Phaser.Tile
 * @member {integer} #worldY
+* @memberof Phaser.Tile
 * @readonly
-* @deprecated Should use Tilemap/layer information when doing calculation.
 */
 Object.defineProperty(Phaser.Tile.prototype, "worldY", {
 
     get: function () {
-        return (this.y * this.layer.tileHeight) | 0;
+        return this.y * this.layer.tileHeight;
     }
 
 });
@@ -762,11 +913,11 @@ Object.defineProperty(Phaser.Tile.prototype, "worldY", {
 /**
 * Half-width of the tile (in pixels).
 *
-* @memberof Phaser.Tile
 * @member {integer} #centerX
+* @memberof Phaser.Tile
 * @protected
 * @readonly
-* @deprecated Should use Tilemap/layer information when doing calculation.
+* @deprecated Only used by Ninja physics; should be local math.
 */
 Object.defineProperty(Phaser.Tile.prototype, "centerX", {
 
@@ -779,11 +930,11 @@ Object.defineProperty(Phaser.Tile.prototype, "centerX", {
 /**
 * Half-height of the tile (in pixels).
 *
-* @memberof Phaser.Tile
 * @member {integer} #centerY
+* @memberof Phaser.Tile
 * @protected
 * @readonly
-* @deprecated Should use Tilemap/layer information when doing calculation.
+* @deprecated Only used by Ninja physics; should be local math.
 */
 Object.defineProperty(Phaser.Tile.prototype, "centerY", {
 
@@ -796,8 +947,8 @@ Object.defineProperty(Phaser.Tile.prototype, "centerY", {
 /**
 * True if interesting for collisions.
 *
-* @memberof Phaser.Tile
 * @member {boolean} #faceTop
+* @memberof Phaser.Tile
 */
 Object.defineProperty(Phaser.Tile.prototype, "faceTop", {
 
@@ -814,8 +965,8 @@ Object.defineProperty(Phaser.Tile.prototype, "faceTop", {
 /**
 * True if interesting for collisions.
 *
-* @memberof Phaser.Tile
 * @member {boolean} #faceBottom
+* @memberof Phaser.Tile
 */
 Object.defineProperty(Phaser.Tile.prototype, "faceBottom", {
 
@@ -832,8 +983,8 @@ Object.defineProperty(Phaser.Tile.prototype, "faceBottom", {
 /**
 * True if interesting for collisions.
 *
-* @memberof Phaser.Tile
 * @member {boolean} #faceLeft
+* @memberof Phaser.Tile
 */
 Object.defineProperty(Phaser.Tile.prototype, "faceLeft", {
 
@@ -850,8 +1001,8 @@ Object.defineProperty(Phaser.Tile.prototype, "faceLeft", {
 /**
 * True if interesting for collisions.
 *
-* @memberof Phaser.Tile
 * @member {boolean} #faceRight
+* @memberof Phaser.Tile
 */
 Object.defineProperty(Phaser.Tile.prototype, "faceRight", {
 
@@ -868,8 +1019,8 @@ Object.defineProperty(Phaser.Tile.prototype, "faceRight", {
 /**
 * Indicating collide with any object on the top.
 *
-* @memberof Phaser.Tile
 * @member {boolean} #collideUp
+* @memberof Phaser.Tile
 */
 Object.defineProperty(Phaser.Tile.prototype, "collideUp", {
 
@@ -886,8 +1037,8 @@ Object.defineProperty(Phaser.Tile.prototype, "collideUp", {
 /**
 * Indicating collide with any object on the bottom.
 *
-* @memberof Phaser.Tile
 * @member {boolean} #collideDown
+* @memberof Phaser.Tile
 */
 Object.defineProperty(Phaser.Tile.prototype, "collideDown", {
 
@@ -904,8 +1055,8 @@ Object.defineProperty(Phaser.Tile.prototype, "collideDown", {
 /**
 * Indicating collide with any object on the left.
 *
-* @memberof Phaser.Tile
 * @member {boolean} #collideLeft
+* @memberof Phaser.Tile
 */
 Object.defineProperty(Phaser.Tile.prototype, "collideLeft", {
 
@@ -922,8 +1073,8 @@ Object.defineProperty(Phaser.Tile.prototype, "collideLeft", {
 /**
 * Indicating collide with any object on the right.
 *
-* @memberof Phaser.Tile
 * @member {boolean} #collideRight
+* @memberof Phaser.Tile
 */
 Object.defineProperty(Phaser.Tile.prototype, "collideRight", {
 

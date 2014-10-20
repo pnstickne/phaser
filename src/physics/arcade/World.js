@@ -1137,7 +1137,7 @@ Phaser.Physics.Arcade.prototype = {
     separateTile: function (i, body, tile, layer) {
 
         //  We re-check for collision in case body was separated in a previous step
-        if (!body.enable || !layer.intersectsCell(tile.x, tile.y, body.position.x, body.position.y, body.right, body.bottom))
+        if (!body.enable || !layer.cellIntersectsBounds(tile.x, tile.y, body.position.x, body.position.y, body.right, body.bottom))
         {
             //  no collision so bail out (separted in a previous step)
             return false;
@@ -1146,7 +1146,7 @@ Phaser.Physics.Arcade.prototype = {
         //  They overlap. Any custom callbacks?
 
         //  A local callback always takes priority over a layer level callback
-        if (tile.hasCollisionTest && !layer.doTileCollisionTest(tile, body.sprite))
+        if (tile.hasCollisionTest && !tile.doTileCollisionTest(body.sprite))
         {
             //  If it returns true then we can carry on, otherwise we should abort.
             return false;

@@ -183,7 +183,8 @@ Phaser.Tilemap.WEST = 3;
 Phaser.Tilemap.prototype = {
 
     /**
-    * Creates an empty map of the given dimensions and one blank layer. If layers already exist they are erased.
+    * Sets the tile tilemap size, tile size, and creates one blank layer to fill the tilemap.
+    * This removes all existing layers.
     *
     * @method Phaser.Tilemap#create
     * @param {string} name - The name of the default layer of the map.
@@ -191,12 +192,10 @@ Phaser.Tilemap.prototype = {
     * @param {number} height - The height of the map in tiles.
     * @param {number} tileWidth - The width of the tiles the map uses for calculations.
     * @param {number} tileHeight - The height of the tiles the map uses for calculations.
-    * @param {Phaser.Group} [group] - Optional Group to add the layer to. If not specified it will be added to the World group.
-    * @return {Phaser.TilemapLayer} The TilemapLayer object. This is an extension of Phaser.Image and can be moved around the display list accordingly.
+    * @param {(Phaser.Group|null)} [group=world] - Optional Group to add the layer to. If not specified it will be added to the World group. If null, will not add to any group.
+    * @return {Phaser.TilemapLayer} The TilemapLayer object, which extends Phaser.Sprite.
     */
     create: function (name, width, height, tileWidth, tileHeight, group) {
-
-        if (typeof group === 'undefined') { group = this.game.world; }
 
         this.width = width;
         this.height = height;
@@ -359,7 +358,7 @@ Phaser.Tilemap.prototype = {
     * @param {number|string} [frame] - If the Sprite image contains multiple frames you can specify which one to use here.
     * @param {boolean} [exists=true] - The default exists state of the Sprite.
     * @param {boolean} [autoCull=false] - The default autoCull state of the Sprite. Sprites that are autoCulled are culled from the camera if out of its range.
-    * @param {Phaser.Group} [group=Phaser.World] - Group to add the Sprite to. If not specified it will be added to the World group.
+    * @param {Phaser.Group} [group=world] - Group to add the Sprite to. If not specified it will be added to the World group.
     * @param {object} [CustomClass=Phaser.Sprite] - If you wish to create your own class, rather than Phaser.Sprite, pass the class here. Your class must extend Phaser.Sprite and have the same constructor parameters.
     * @param {boolean} [adjustY=true] - By default the Tiled map editor uses a bottom-left coordinate system. Phaser uses top-left. So most objects will appear too low down. This parameter moves them up by their height.
     */
@@ -416,10 +415,12 @@ Phaser.Tilemap.prototype = {
     * @param {number|string} layer - The layer array index value, or if a string is given the layer name, within the map data that this TilemapLayer represents.
     * @param {number} [width] - The rendered width of the layer, should never be wider than Game.width. If not given it will be set to Game.width.
     * @param {number} [height] - The rendered height of the layer, should never be wider than Game.height. If not given it will be set to Game.height.
-    * @param {Phaser.Group} [group] - Optional Group to add the object to. If not specified it will be added to the World group.
-    * @return {Phaser.TilemapLayer} The TilemapLayer object. This is an extension of Phaser.Sprite and can be moved around the display list accordingly.
+    * @param {(Phaser.Group|null)} [group=world] - Optional Group to add the object to. If not specified it will be added to the World group. If null, will not add to any group.
+    * @return {Phaser.TilemapLayer} The TilemapLayer object, which extends Phaser.Sprite.
     */
     createLayer: function (layerKey, width, height, group) {
+
+        if (typeof group === 'undefined') { group = this.game.world; }
 
         //  Add Buffer support for the left of the canvas
 
@@ -435,7 +436,59 @@ Phaser.Tilemap.prototype = {
             return;
         }
 
-        return group.add(new Phaser.TilemapLayer(this.game, this, layer.layerIndex, width, height));
+        var tilemapLayer = new Phaser.TilemapLayer(this.game, this, layer.layerIndex, width, height);
+        tilemapLayer.name = layerKey;  // As good as any..
+        
+        if (group)
+        {
+            group.add(tilemapLayer);
+        }
+
+        return tilemapLayer;
+
+    },
+
+    /**
+    * Creates a new and empty layer on this Tilemap. By default TilemapLayers are fixed to the camera.
+    *
+    * @method Phaser.Tilemap#createBlankLayer
+    * @param {string} name - The name of this layer. Must be unique within the map.
+    * @param {number} width - The width of the layer in tiles.
+    * @param {number} height - The height of the layer in tiles.
+    * @param {number} tileWidth - The width of the tiles the layer uses for calculations.
+    * @param {number} tileHeight - The height of the tiles the layer uses for calculations.
+    * @param {(Phaser.Group|null)} [group=world] - Optional Group to add the layer to. If not specified it will be added to the World group; if null, will not add to any group.
+    * @return {Phaser.TilemapLayer} The TilemapLayer object, which extends Phaser.Sprite.
+    */
+    createBlankLayer: function (name, width, height, tileWidth, tileHeight, group) {
+
+        if (typeof group === 'undefined') { group = this.game.world; }
+
+        if (this.getLayerIndex(name) !== null)
+        {
+            console.warn('Tilemap.createBlankLayer: Layer with matching name already exists');
+            return;
+        }
+
+        //  Don't specify owner to constructor; else addTileLayer won't accept it
+        var layer = new Phaser.TileLayer(null, width, height, tileWidth, tileHeight);
+        this.addTileLayer(layer);
+
+        this.currentLayer = this.layers.length - 1;
+
+        //  Might be more appropriate to be  w * layer.tileWidth, etc.
+        var w = Phaser.Math.clamp(layer.widthInPixels, 0, this.game.width);
+        var h = Phaser.Math.clamp(layer.heightInPixels, 0, this.game.height);
+
+        var tilemapLayer = new Phaser.TilemapLayer(this.game, this, layer.layerIndex, w, h);
+        tilemapLayer.name = name;
+        
+        if (group)
+        {
+            group.add(tilemapLayer);
+        }
+
+        return tilemapLayer;
 
     },
 
@@ -469,60 +522,13 @@ Phaser.Tilemap.prototype = {
     },
 
     /**
-    * Creates a new and empty layer on this Tilemap. By default TilemapLayers are fixed to the camera.
-    *
-    * @method Phaser.Tilemap#createBlankLayer
-    * @param {string} name - The name of this layer. Must be unique within the map.
-    * @param {number} width - The width of the layer in tiles.
-    * @param {number} height - The height of the layer in tiles.
-    * @param {number} tileWidth - The width of the tiles the layer uses for calculations.
-    * @param {number} tileHeight - The height of the tiles the layer uses for calculations.
-    * @param {Phaser.Group} [group] - Optional Group to add the layer to. If not specified it will be added to the World group.
-    * @return {Phaser.TilemapLayer} The TilemapLayer object. This is an extension of Phaser.Image and can be moved around the display list accordingly.
-    */
-    createBlankLayer: function (name, width, height, tileWidth, tileHeight, group) {
-
-        if (typeof group === 'undefined') { group = this.game.world; }
-
-        if (this.getLayerIndex(name) !== null)
-        {
-            console.warn('Tilemap.createBlankLayer: Layer with matching name already exists');
-            return;
-        }
-
-        var layer = new Phaser.TileLayer(this, width, height, tileWidth, tileHeight);
-        this.addTileLayer(layer);
-
-        this.currentLayer = this.layers.length - 1;
-
-        var w = layer.widthInPixels;
-        var h = layer.heightInPixels;
-
-        if (w > this.game.width)
-        {
-            w = this.game.width;
-        }
-
-        if (h > this.game.height)
-        {
-            h = this.game.height;
-        }
-
-        var output = new Phaser.TilemapLayer(this.game, this, layer.layerIndex, w, h);
-        output.name = name;
-
-        return group.add(output);
-
-    },
-
-    /**
     * Gets the layer index based on the layers name.
     *
     * @method Phaser.Tilemap#getIndex
     * @protected
     * @param {array} location - The local array to search.
     * @param {string} name - The name of the array element to get.
-    * @return {number} The index of the element in the array, or null if not found.
+    * @return {(number|null)} The index of the element in the array, or null if not found.
     */
     getIndex: function (location, name) {
 
@@ -543,7 +549,7 @@ Phaser.Tilemap.prototype = {
     *
     * @method Phaser.Tilemap#getLayerIndex
     * @param {string} name - The name of the layer to get.
-    * @return {number} The index of the layer in this tilemap, or null if not found.
+    * @return {(number|null)} The index of the layer in this tilemap, or null if not found.
     */
     getLayerIndex: function (name) {
 
@@ -556,7 +562,7 @@ Phaser.Tilemap.prototype = {
     *
     * @method Phaser.Tilemap#getTilesetIndex
     * @param {string} name - The name of the tileset to get.
-    * @return {number} The index of the tileset in this tilemap, or null if not found.
+    * @return {(number|null)} The index of the tileset in this tilemap, or null if not found.
     */
     getTilesetIndex: function (name) {
 
@@ -569,7 +575,7 @@ Phaser.Tilemap.prototype = {
     *
     * @method Phaser.Tilemap#getImageIndex
     * @param {string} name - The name of the image to get.
-    * @return {number} The index of the image in this tilemap, or null if not found.
+    * @return {(number|null)} The index of the image in this tilemap, or null if not found.
     */
     getImageIndex: function (name) {
 
@@ -591,9 +597,11 @@ Phaser.Tilemap.prototype = {
     },
 
     /**
-    * Sets a global collision callback for the given tile index within the layer. This will affect all tiles on this layer that have the same index.
+    * Sets a layer-wide collision callback for the given tile indexes/types within the layer. This will affect all tiles on this layer with the given index.
+    *
     * If a callback is already set for the tile index it will be replaced. Set the callback to null to remove it.
-    * If you want to set a callback for a tile at a specific location on the map then see setTileLocationCallback.
+    *
+    * Use `setTileLocationCallback` to set a callback for tiles at a specific location.
     *
     * @method Phaser.Tilemap#setTileIndexCallback
     * @param {number|array} indexes - Either a single tile index, or an array of tile indexes to have a collision callback set for.
@@ -617,9 +625,9 @@ Phaser.Tilemap.prototype = {
     },
 
     /**
-    * Sets a common collision callback for existing tiles in the given map location within the layer. This will affect all tiles (including those with index=0) on this layer found in the given area as long as they exist.
+    * Sets a common collision callback for existing tiles in the given map location within the layer. This will affect all tiles (including those with an index/type of 0) in the given area as long as they exist.
+    *
     * If a callback is already set for the tile index it will be replaced. Set the callback to null to remove it.
-    * If you want to set a callback for a tile at a specific location on the map then see setTileLocationCallback.
     *
     * @method Phaser.Tilemap#setTileLocationCallback
     * @param {number} x - X position of the top left of the area to copy (given in tiles, not pixels)
@@ -628,30 +636,31 @@ Phaser.Tilemap.prototype = {
     * @param {number} height - The height of the area to copy (given in tiles, not pixels)
     * @param {function} callback - The callback that will be invoked when the tile is collided with.
     * @param {object} callbackContext - The context under which the callback is called.
-    * @param {number|string|Phaser.TilemapLayer} [layer] - The layer to operate on. If not given will default to this.currentLayer.
+    * @param {number|string|Phaser.TilemapLayer} [layer=(currentLayer)] - The layer to operate on.
     */
     setTileLocationCallback: function (x, y, width, height, callback, callbackContext, layerKey) {
 
         var layer = this.getTileLayer(layerKey);
 
+        var collisionTest = [callback, callbackContext];
+
         layer.transformRegion(new Phaser.Rectangle(x, y, width, height),
             function (tiles) {
                 for (var i = 0; i < tiles.length; i++) {
                     var tile = tiles[i];
-                    tile.setCollisionCallback(callback, callbackContext);
+                    tile.setSharedCollisionTest(collisionTest);
                 }
             }, this, null, false);
 
     },
 
     /**
-    * Sets collision the given tile or tiles. You can pass in either a single numeric index or an array of indexes: [ 2, 3, 15, 20].
-    * The `collides` parameter controls if collision will be enabled (true) or disabled (false).
+    * Enables collision the for the given tile indexes/types.
     *
     * @method Phaser.Tilemap#setCollision
     * @param {number|array} indexes - Either a single tile index, or an array of tile IDs to be checked for collision.
-    * @param {boolean} [collides=true] - If true it will enable collision. If false it will clear collision.
-    * @param {number|string|Phaser.TilemapLayer} [layer] - The layer to operate on. If not given will default to this.currentLayer.
+    * @param {boolean} [collides=true] - If true collisions will be enabled; otherwise collisions will be cleared.
+    * @param {number|string|Phaser.TilemapLayer} [layer=(currentLayer)] - The layer to operate on.
     * @param {boolean} [recalculate=true] - Recalculates the tile faces after the update.
     */
     setCollision: function (indexes, collides, layerKey, recalculate) {
@@ -671,28 +680,28 @@ Phaser.Tilemap.prototype = {
         var collideFlags = 0;
         if (collides)
         {
-            collideFlags = Phaser.Tile.COLLIDES_ALL;
+            collideFlags = Phaser.Tile.COLLIDE_ALL;
         }
 
-        layer.setDefaultCollisionRuleForTileIndexes(setFor, collideFlags, true);
+        layer.setDefaultCollisionFlags(setFor, collideFlags, true);
 
         if (recalculate)
         {
-            this.refreshLayer(true);
+            layer.refreshLayer(false);
         }
 
     },
 
     /**
-    * Sets collision on a range of tiles where the tile IDs increment sequentially.
+    * Enables collision the for the given tile indexes/types within the sepcified inclusive range.
+    *
     * Calling this with a start value of 10 and a stop value of 14 would set collision for tiles 10, 11, 12, 13 and 14.
-    * The `collides` parameter controls if collision will be enabled (true) or disabled (false).
     *
     * @method Phaser.Tilemap#setCollisionBetween
     * @param {number} start - The first index of the tile to be set for collision.
-    * @param {number} stop - The last index of the tile to be set for collision.
-    * @param {boolean} [collides=true] - If true it will enable collision. If false it will clear collision.
-    * @param {number|string|Phaser.TilemapLayer} [layer] - The layer to operate on. If not given will default to this.currentLayer.
+    * @param {number} stop - The last index of the tile to be set for collision, inclusive.
+    * @param {boolean} [collides=true] - If true collisions will be enabled; otherwise collisions will be cleared.
+    * @param {number|string|Phaser.TilemapLayer} [layer=(currentLayer)] - The layer to operate on.
     * @param {boolean} [recalculate=true] - Recalculates the tile faces after the update.
     */
     setCollisionBetween: function (start, stop, collides, layerKey, recalculate) {
@@ -708,13 +717,14 @@ Phaser.Tilemap.prototype = {
     },
 
     /**
-    * Sets collision on all tiles in the given layer, except for the IDs of those in the given array.
-    * The `collides` parameter controls if collision will be enabled (true) or disabled (false).
+    * Enables collision of the given tile indexes/types *except* for the indexes specified in the given array.
+    *
+    * This does not remove any previously enabled collisions even if they are not specified in the supplied indexes.
     *
     * @method Phaser.Tilemap#setCollisionByExclusion
     * @param {array} indexes - An array of the tile IDs to not be counted for collision.
-    * @param {boolean} [collides=true] - If true it will enable collision. If false it will clear collision.
-    * @param {number|string|Phaser.TilemapLayer} [layer] - The layer to operate on. If not given will default to this.currentLayer.
+    * @param {boolean} [collides=true] - If true collisions will be enabled; otherwise collisions will be cleared.
+    * @param {number|string|Phaser.TilemapLayer} [layer=(currentLayer)] - The layer to operate on.
     * @param {boolean} [recalculate=true] - Recalculates the tile faces after the update.
     */
     setCollisionByExclusion: function (indexes, collides, layerKey, recalculate) {
@@ -743,14 +753,14 @@ Phaser.Tilemap.prototype = {
 
     /**
     * Sets collision values on a tile in the set.
-    * You shouldn't usually call this method directly, instead use setCollision, setCollisionBetween or setCollisionByExclusion.
+    * Use `setCollision`, `setCollisionBetween`, or `setCollisionByExclusion` instead of invoking this method directly.
     *
     * @method Phaser.Tilemap#setCollisionByIndex
     * @protected
     * @deprecated Do not use this directly.
     * @param {number} index - The index of the tile on the layer.
     * @param {boolean} [collides=true] - If true it will enable collision on the tile. If false it will clear collision values from the tile.
-    * @param {number} [layer] - The layer to operate on. If not given will default to this.currentLayer.
+    * @param {number|string|Phaser.TilemapLayer} [layer=(currentLayer)] - The layer to operate on.
     * @param {boolean} [recalculate=true] - Recalculates the tile faces after the update.
     */
     setCollisionByIndex: function (index, collides, layerKey, recalculate) {
@@ -762,9 +772,8 @@ Phaser.Tilemap.prototype = {
     /**
     * Gets the actual TileLayer object.
     *
-    * @method Phaser.Tilemap#getTileLayer
     * @protected
-    * @param {number|string|Phaser.TilemapLayer} layer - The layer to operate on. If not given will default to this.currentLayer.
+    * @param {number|string|Phaser.TilemapLayer} layer - The layer to resolve.
     * @return {(Phaser.TileLayer|null)} The corresponding TileLayer or null.
     */
     getTileLayer: function (layerKey) {
@@ -775,11 +784,11 @@ Phaser.Tilemap.prototype = {
     },
 
     /**
-    * Gets the TilemapLayer index.
+    * Gets the *index* for the corresponding tile layer.
     *
     * @method Phaser.Tilemap#getLayer
     * @protected
-    * @param {number|string|Phaser.TilemapLayer} layer - The layer to operate on. If not given will default to this.currentLayer.
+    * @param {number|string|Phaser.TilemapLayer} [layer=(currentLayer)] - The layer to resolve to an index.
     * @return {number} The TilemapLayer index.
     */
     getLayer: function (layerKey) {
@@ -796,8 +805,8 @@ Phaser.Tilemap.prototype = {
         }
         else if (type === 'object')
         {
-            //  Eg. TileLayer or TilemapLayer
-            return layerKey.layerIndex;
+            //   eg. TileLayer or TilemapLayer
+            return layerKey.index;
         }
 
         return layerKey;
@@ -807,7 +816,6 @@ Phaser.Tilemap.prototype = {
     /**
     * Get the properties associated with the tile index/type. The properties are shared across the entire Tilemap.
     *
-    * @method Phaser.Tileset#getPropertiesForTileIndex
     * @protected
     * @param {integer} tileIndex - Tile index/type to find the properties for.
     * @param {boolean} ensureProperties - If true a tile-index properties object will be created (and saved) as appropriate; will not create properties for an out-of-range tile index.
@@ -819,15 +827,25 @@ Phaser.Tilemap.prototype = {
         var tileset = this.tilesets[setid];
 
         var setCorrectedIndex = tileIndex - tileset.firstgid;
-        var prop = tileset.tileProperties[setCorrectedIndex];
 
-        if (!prop && ensureProperties)
+        if (setCorrectedIndex < 0 || setCorrectedIndex >= tileset.tileProperties.length)
+        {
+            //  Can't make up a new tile index ..
+            return null;
+        }
+
+        var prop = tileset.tileProperties[setCorrectedIndex];
+        if (prop)
+        {
+            return prop;
+        }
+        else if (ensureProperties)
         {
             return (tileset.tileProperties[setCorrectedIndex] = {});
         }
         else
         {
-            return prop || null;
+            return null;
         }
 
     },
@@ -835,16 +853,13 @@ Phaser.Tilemap.prototype = {
     /**
     * Turn off/on the recalculation of faces for tile or collission updates for all layers.
     *
-    * setPreventRecalculate(true) puts recalculation on hold while
-    * setPreventRecalculate(false) recalculates all the changed layers.
-    *
     * @method Phaser.Tilemap#setPreventRecalculate
     * @deprecated Use `TileMap#suppressRefresh` for a specific layer instead.
-    * @param {boolean} value - if true it will put the recalculation on hold.
+    * @param {boolean} prevent - If true recalculations will be put hold; otherwise recalculations will be resumed.
     */
-    setPreventRecalculate: function (value) {
+    setPreventRecalculate: function (prevent) {
 
-        if (value && !this.preventingRecalculate)
+        if (prevent && !this.preventingRecalculate)
         {
             //  Enable suppression for all layers
             this.preventingRecalculate = true;
@@ -855,7 +870,7 @@ Phaser.Tilemap.prototype = {
                 layer.suppressRefresh = true;
             }
         }
-        else if (!value && this.preventingRecalculate)
+        else if (!prevent && this.preventingRecalculate)
         {
             //  Disable suppression for all layers
             this.preventingRecalculate = false;
@@ -874,7 +889,7 @@ Phaser.Tilemap.prototype = {
     * @method Phaser.Tilemap#calculateFaces
     * @deprecated Use {@link Phaser.TileMap#refreshLayer} instead.
     * @protected
-    * @param {number|string|Phaser.TilemapLayer} [layer] - The layer to operate on. If not given will default to this.currentLayer.
+    * @param {number|string|Phaser.TilemapLayer} [layer=(currentLayer)] - The layer to operate on.
     */
     calculateFaces: function (layerKey) {
 
@@ -887,19 +902,15 @@ Phaser.Tilemap.prototype = {
     * Gets the tile above the tile coordinates given.
     *
     * @method Phaser.Tilemap#getTileAbove
-    * @param {number} layer - The local layer index to get the tile from. Can be determined by Tilemap.getLayer().
-    * @param {number} x - The x coordinate to get the tile from. In tiles, not pixels.
-    * @param {number} y - The y coordinate to get the tile from. In tiles, not pixels.
+    * @param {number|string|Phaser.TilemapLayer} [layer=(currentLayer)] - The layer to operate on
+    * @param {number} x - The x coordinate component of the cell (in tiles)
+    * @param {number} x - The y coordinate component of the cell (in tiles)
+    * @return {(Phaser.Tile|null)} - A copy of the Tile, or null.
     */
     getTileAbove: function (layerKey, x, y) {
 
         var layer = this.getTileLayer(layerKey);
-        if (y > 0)
-        {
-            return layer.getTileCopy(x, y - 1, true);
-        }
-
-        return null;
+        return layer.getTileCopy(x, y - 1, true);
 
     },
 
@@ -907,19 +918,15 @@ Phaser.Tilemap.prototype = {
     * Gets the tile below the tile coordinates given.
     *
     * @method Phaser.Tilemap#getTileBelow
-    * @param {number} layer - The local layer index to get the tile from. Can be determined by Tilemap.getLayer().
-    * @param {number} x - The x coordinate to get the tile from. In tiles, not pixels.
-    * @param {number} y - The y coordinate to get the tile from. In tiles, not pixels.
+    * @param {number|string|Phaser.TilemapLayer} [layer=(currentLayer)] - The layer to operate on
+    * @param {number} x - The x coordinate component of the cell (in tiles)
+    * @param {number} x - The y coordinate component of the cell (in tiles)
+    * @return {(Phaser.Tile|null)} - A copy of the Tile, or null.
     */
     getTileBelow: function (layerKey, x, y) {
 
         var layer = this.getTileLayer(layerKey);
-        if (y < layer.height - 1)
-        {
-            return layer.getTileCopy(x, y + 1, true);
-        }
-
-        return null;
+        return layer.getTileCopy(x, y + 1, true);
 
     },
 
@@ -927,19 +934,15 @@ Phaser.Tilemap.prototype = {
     * Gets the tile to the left of the tile coordinates given.
     *
     * @method Phaser.Tilemap#getTileLeft
-    * @param {number} layer - The local layer index to get the tile from. Can be determined by Tilemap.getLayer().
-    * @param {number} x - The x coordinate to get the tile from. In tiles, not pixels.
-    * @param {number} y - The y coordinate to get the tile from. In tiles, not pixels.
+    * @param {number|string|Phaser.TilemapLayer} [layer=(currentLayer)] - The layer to operate on
+    * @param {number} x - The x coordinate component of the cell (in tiles)
+    * @param {number} x - The y coordinate component of the cell (in tiles)
+    * @return {(Phaser.Tile|null)} - A copy of the Tile, or null.
     */
     getTileLeft: function (layerKey, x, y) {
 
         var layer = this.getTileLayer(layerKey);
-        if (x > 0)
-        {
-            return layer.getTileCopy(x - 1, y, true);
-        }
-
-        return null;
+        return layer.getTileCopy(x - 1, y, true);
 
     },
 
@@ -947,19 +950,15 @@ Phaser.Tilemap.prototype = {
     * Gets the tile to the right of the tile coordinates given.
     *
     * @method Phaser.Tilemap#getTileRight
-    * @param {number} layer - The local layer index to get the tile from. Can be determined by Tilemap.getLayer().
-    * @param {number} x - The x coordinate to get the tile from. In tiles, not pixels.
-    * @param {number} y - The y coordinate to get the tile from. In tiles, not pixels.
+    * @param {number|string|Phaser.TilemapLayer} [layer=(currentLayer)] - The layer to operate on
+    * @param {number} x - The x coordinate component of the cell (in tiles)
+    * @param {number} x - The y coordinate component of the cell (in tiles)
+    * @return {(Phaser.Tile|null)} - A copy of the Tile, or null.
     */
     getTileRight: function (layerKey, x, y) {
 
         var layer = this.getTileLayer(layerKey);
-        if (x < layer.width - 1)
-        {
-            return layer.getTileCopy(x + 1, y, true);
-        }
-
-        return null;
+        return layer.getTileCopy(x + 1, y, true);
 
     },
 
@@ -971,11 +970,11 @@ Phaser.Tilemap.prototype = {
     */
     setLayer: function (layerKey) {
 
-        var layer = this.getTileLayer(layerKey);
+        var layerIndex = this.getLayer(layerKey);
 
-        if (layer)
+        if (layerIndex !== null)
         {
-            this.currentLayer = layer.layerIndex;
+            this.currentLayer = layerIndex;
         }
 
     },
@@ -999,27 +998,27 @@ Phaser.Tilemap.prototype = {
     /**
     * Removes the tile located at the given coordinates and updates the collision data.
     *
-    * @method Phaser.Tilemap#removeTile
+    * @method Phaser.Tilemap#removeTile    
     * @param {number} x - X position to place the tile (given in tile units, not pixels)
     * @param {number} y - Y position to place the tile (given in tile units, not pixels)
     * @param {number|string|Phaser.TilemapLayer} [layer] - The layer to modify.
-    * @return {Phaser.Tile} The Tile object that was removed from this map.
+    * @return {Phaser.Tile|null} The Tile object that was removed from this map, if any.
     */
     removeTile: function (x, y, layerKey) {
 
         var layer = this.getTileLayer(layerKey);
 
-        if (x >= 0 && x < layer.width && y >= 0 && y < layer.height)
+        var tile = layer.getTileCopy(x, y);
+        if (tile)
         {
-            var tile = layer.getTileCopy(x, y);
-            if (tile)
-            {
+            layer.clearCell(x, y);
+            layer.refreshLayer(false);
 
-                layer.clearCell(x, y);
-                layer.refreshLayer(false);
-
-                return tile;
-            }
+            return tile;
+        }
+        else
+        {
+            return null;
         }
 
     },
@@ -1035,14 +1034,12 @@ Phaser.Tilemap.prototype = {
     * @param {number|string|Phaser.TilemapLayer} [layer] - The layer to modify.
     * @return {Phaser.Tile} The Tile object that was removed from this map.
     */
-    removeTileWorldXY: function (x, y, tileWidth, tileHeight, layer) {
-
-        layer = this.getLayer(layer);
+    removeTileWorldXY: function (x, y, tileWidth, tileHeight, layerKey) {
 
         x = this.game.math.snapToFloor(x, tileWidth) / tileWidth;
         y = this.game.math.snapToFloor(y, tileHeight) / tileHeight;
 
-        return this.removeTile(x, y, layer);
+        return this.removeTile(x, y, layerKey);
 
     },
 
@@ -1077,7 +1074,7 @@ Phaser.Tilemap.prototype = {
                 layer.setCell(x, y, tileOrIndex);
             }
 
-            layer.refreshLayer();
+            layer.refreshLayer(false);
 
             return layer.getTileCopy(x, y);
         }
@@ -1098,14 +1095,12 @@ Phaser.Tilemap.prototype = {
     * @param {number|string|Phaser.TilemapLayer} [layer] - The layer to modify.
     * @return {Phaser.Tile} The Tile object that was created or added to this map.
     */
-    putTileWorldXY: function (tile, x, y, tileWidth, tileHeight, layer) {
-
-        layer = this.getLayer(layer);
+    putTileWorldXY: function (tile, x, y, tileWidth, tileHeight, layerKey) {
 
         x = this.game.math.snapToFloor(x, tileWidth) / tileWidth;
         y = this.game.math.snapToFloor(y, tileHeight) / tileHeight;
 
-        return this.putTile(tile, x, y, layer);
+        return this.putTile(tile, x, y, layerKey);
 
     },
 
@@ -1115,19 +1110,20 @@ Phaser.Tilemap.prototype = {
     * The search starts from the top-left tile and continues horizontally until it hits the end of the row, then it drops down to the next column.
     * If the reverse boolean is true, it scans starting from the bottom-right corner travelling up to the top-left.
     *
-    * @method Phaser.Tilemap#searchTileIndex
+    * @method
+    * @deprecated Functionality is not used internally.
     * @param {number} index - The tile index value to search for.
     * @param {number} [skip=0] - The number of times to skip a matching tile before returning.
     * @param {number} [reverse=false] - If true it will scan the layer in reverse, starting at the bottom-right. Otherwise it scans from the top-left.
     * @param {number|string|Phaser.TilemapLayer} [layer] - The layer to get the tile from.
     * @return {Phaser.Tile} The first (or n skipped) tile with the matching index.
     */
-    searchTileIndex: function (index, skip, reverse, layer) {
+    searchTileIndex: function (index, skip, reverse, layerKey) {
 
         if (typeof skip === 'undefined') { skip = 0; }
         if (typeof reverse === 'undefined') { reverse = false; }
 
-        layer = this.getLayer(layer);
+        var layer = this.getLayer(layerKey);
 
         var c = 0;
 
@@ -1191,15 +1187,7 @@ Phaser.Tilemap.prototype = {
         if (typeof nonNull === 'undefined') { nonNull = false; }
 
         var layer = this.getTileLayer(layerKey);
-
-        if (x >= 0 && x < layer.width && y >= 0 && y < layer.height)
-        {
-            return layer.getTileCopy(x, y, nonNull);
-        }
-        else
-        {
-            return null;
-        }
+        return layer.getTileCopy(x, y, nonNull);
 
     },
 
@@ -1214,17 +1202,15 @@ Phaser.Tilemap.prototype = {
     * @param {number|string|Phaser.TilemapLayer} [layer] - The layer to get the tile from.
     * @return {Phaser.Tile} The tile at the given coordinates.
     */
-    getTileWorldXY: function (x, y, tileWidth, tileHeight, layer) {
+    getTileWorldXY: function (x, y, tileWidth, tileHeight, layerKey) {
 
         if (typeof tileWidth === 'undefined') { tileWidth = this.tileWidth; }
         if (typeof tileHeight === 'undefined') { tileHeight = this.tileHeight; }
 
-        layer = this.getLayer(layer);
-
         x = this.game.math.snapToFloor(x, tileWidth) / tileWidth;
         y = this.game.math.snapToFloor(y, tileHeight) / tileHeight;
 
-        return this.getTile(x, y, layer);
+        return this.getTile(x, y, layerKey);
 
     },
 
@@ -1243,12 +1229,6 @@ Phaser.Tilemap.prototype = {
     copy: function (x, y, width, height, layerKey) {
 
         var layer = this.getTileLayer(layerKey);
-
-        if (!layer)
-        {
-            //  Guard doesn't exist elsewhere..
-            return;
-        }
 
         if (typeof x === "undefined") { x = 0; }
         if (typeof y === "undefined") { y = 0; }
@@ -1309,9 +1289,7 @@ Phaser.Tilemap.prototype = {
     */
     forEach: function (callback, context, x, y, width, height, layerKey) {
 
-        var layer = this.getTileLayer(layerKey);
-
-        this.copy(x, y, width, height, layer);
+        this.copy(x, y, width, height, layerKey);
 
         if (this._results.length < 2)
         {
@@ -1320,7 +1298,7 @@ Phaser.Tilemap.prototype = {
 
         this._results.forEach(callback, context);
 
-        this.paste(x, y, this._results, layer);
+        this.paste(x, y, this._results, layerKey);
 
     },
 
@@ -1391,7 +1369,7 @@ Phaser.Tilemap.prototype = {
    /*
     * @private
     */
-    _replaceTransform: function (tiles, transform, sourceIndex, destIndex)
+    _replaceTransform: function (tiles, context, sourceIndex, destIndex)
     {
 
         for (var i = 0; i < tiles.length; i++)
@@ -1428,7 +1406,7 @@ Phaser.Tilemap.prototype = {
    /*
     * @private
     */
-    _randomTransform: function (tiles, transform)
+    _randomTransform: function (tiles)
     {
 
         var indexes = [];
@@ -1475,7 +1453,7 @@ Phaser.Tilemap.prototype = {
    /*
     * @private
     */
-    _shuffleTransform: function (tiles, transform)
+    _shuffleTransform: function (tiles)
     {
 
         var indexes = [];
@@ -1483,11 +1461,7 @@ Phaser.Tilemap.prototype = {
         for (var i = 0; i < tiles.length; i++)
         {
             var tile = tiles[i];
-
-            if (tile.index > 0)
-            {
-                indexes.push(tile.index);
-            }
+            indexes.push(tile.index);
         }
 
         Phaser.Utils.shuffle(indexes);
@@ -1495,8 +1469,7 @@ Phaser.Tilemap.prototype = {
         for (var i = 0; i < tiles.length; i++)
         {
             var tile = tiles[i];
-
-            tile.index = this.game.rnd.pick(indexes);
+            tile.index = indexes[i];
         }
 
     },

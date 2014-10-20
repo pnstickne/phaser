@@ -11,12 +11,17 @@
 * A TileLayer is usually rendered by a {@link Phaser.TilemapLayer}.
 *
 * A cell is "data" at a particular location represented as a grid and a Tile is a copy/view of a cell.
-* See the `get*` methods and {@link Phaser.Tile} documentation for Tile usage restrictions.
+* See {@link Phaser.TileLayer#getTileRef getTileRef} and {@link Phaser.Tile} documentation for Tile usage restrictions.
 *
-* A cell/tile with a negative index (ie. -1) is said to be *non-existant*. When updated any internal state associated with such a non-existant cell is cleared as if `removeCell` was called. A tile with an index of 0 exists (and thus *can* participate in collision handling, etc.) but is not normally displayed.
+* A cell/tile with a negative index (ie. -1) is said to be *non-existant*. When updated any internal state associated with such a non-existant cell is cleared as if `removeCell` was called. A tile with an index of 0 exists and thus *can* participate in collision handling, etc.
 *
 * @class Phaser.TileLayer
 * @constructor
+* @param {Phaser.Tilemap} tilemap - Leave this null as it will be set when added to a Tilemap.
+* @param {integer} width - Width in tiles.
+* @param {integer} height - Height in tiles.
+* @param {integer} tileWidth - Width of each tile (in pixels); should match Tilemap.
+* @param {integer} tileHeight - Height of each tile (in pixels); should match Tilemap.
 */
 Phaser.TileLayer = function (tilemap, width, height, tileWidth, tileHeight) {
 
@@ -27,12 +32,21 @@ Phaser.TileLayer = function (tilemap, width, height, tileWidth, tileHeight) {
     */
     this.name = null;
 
+    /**
+    * @todo Define usage/meaning or remove.
+    * @private
+    */
     this.x = 0;
 
+    /**
+    * @todo Define usage/meaning or remove.
+    * @private
+    */
     this.y = 0;
 
     /**
     * The associated tilemap. This should be set after the layer is added to a tilemap.
+    * (This is becuase a TileLayer is first created by the parser, which has no knowledge of the final Tilemap.)
     * @member {Phaser.Tilemap}
     * @private
     */
@@ -43,7 +57,7 @@ Phaser.TileLayer = function (tilemap, width, height, tileWidth, tileHeight) {
     * @member {integer}
     * @private
     */
-    this.layerIndex = null;
+    this.layerIndex = -1;
 
     /**
     * Width of the layer in tiles.
@@ -79,7 +93,7 @@ Phaser.TileLayer = function (tilemap, width, height, tileWidth, tileHeight) {
 
     /**
     * Width of the layer (in pixels).
-    * @property {integer}
+    * @member {integer}
     * @public
     * @readonly
     */
@@ -87,7 +101,7 @@ Phaser.TileLayer = function (tilemap, width, height, tileWidth, tileHeight) {
 
     /**
     * Height of the layer (in pixels).
-    * @property {integer}
+    * @member {integer}
     * @public
     * @readonly
     */
@@ -97,7 +111,7 @@ Phaser.TileLayer = function (tilemap, width, height, tileWidth, tileHeight) {
     * Layer opacity - not currently used internally.
     * @member {number}
     * @private
-    * @todo Currently not used.
+    * @todo Currently unused?
     */
     this.alpha = 1;
 
@@ -105,7 +119,7 @@ Phaser.TileLayer = function (tilemap, width, height, tileWidth, tileHeight) {
     * Layer visibility - not currently used internally.
     * @member {boolean} 
     * @private
-    * @todo Currently not used.
+    * @todo Currently unused?
     */
     this.visible = true;
 
@@ -127,9 +141,9 @@ Phaser.TileLayer = function (tilemap, width, height, tileWidth, tileHeight) {
 
     /**
     * Other layer body properties.
+    * This is used by physics engines but is otherwise not used by the layer.
     * @member {object[]}
-    * @private
-    * @todo Needs usage formalization.
+    * @protected
     */
     this.bodies = [];
 
@@ -138,7 +152,7 @@ Phaser.TileLayer = function (tilemap, width, height, tileWidth, tileHeight) {
     *
     * This is *an implementation detail* and direct-usage of this field, except for implementation-specific usage, should be avoided.
     *
-    * @member {Phaser.Tile[][]} 
+    * @member {array<Phaser.Tile[]>}
     * @protected
     */
     this.data = (function (width, height) {
@@ -161,30 +175,52 @@ Phaser.TileLayer = function (tilemap, width, height, tileWidth, tileHeight) {
 
     })(width, height);
 
-    // @type A role object
-    // roleId: {integer}
-    // roleName: {string}
-    // properties: (possibly null)
+    /**
+    * @typedef Phaser.TileLayer~RoleData
+    * @private
+    * @type {object}
+    * @property {integer} roleId - ID of the role, should be larger than 0 as roleId = 0 is "invalid".
+    * @property {string} roleName - Name of the role, should be unique within the Layer.
+    * @property {(object|null)} roleRroperties - Properties for this role, if any.
+    */
 
-    //  A mapping of roleId to role objects
-    this._roles = [];
-    //  A mapping of role names to roles
+    /**
+    * Data relating to a specific role index/type. This includes callbacks, default settings, etc.
+    * @member {Phaser.TileLayer~RoleData}
+    * @private
+    */
+    this._roleData = [null];
+
+    /**
+    * @member {object} Object mapping names to Phaser.TileLayer~RoleData
+    * @private
+    */
     this._rolesByName = {};
 
     /**
-    * Rules relating to a specific tile index/type. This includes callbacks, default settings, etc.
-    * @member {Phaser.TileLayer~IndexRules}
+    * @typedef Phaser.TileLayer~IndexData
     * @private
+    * @type {object}
+    * @property {(function|null)} collisionTest - The tile/index collision test, if any.
+    * @property {(object|null)} collisionContext - The context of the collision test, if any.
+    * @property {(integer|null)} defaultCollideMask - See {@link Phaser.Tile#tileFlags}. Only applied when non-null.
+    * @property {(object|null)} indexProperties - Properties associated with this index.
     */
-    this._indexRules = [];
 
     /**
-    * @type Phaser.TileLayer~IndexRules
+    * Data relating to a specific tile index/type. This includes collision callbacks, default settings, etc.
+    * @member {Phaser.TileLayer~IndexData}
     * @private
-    * @property {function} callback
-    * @property {object} callbackContext
-    * @property {integer} defaultCollide
     */
+    this._indexData = [];
+
+    /**
+    * If true then all Tiles fetched from this layer will use Layer-local index/type properties (see {@link Phaser.Tile#indexProperties}). This should be set prior to using any index/type properties and not changed.
+    * 
+    * @public
+    * @default
+    */
+    this.useLayerIndexProperties = true;
 
     /**
     * The current change count. This is incremented when a cell is suspected of having been modified. The need to handle changes (ie. redrawing) can be detected by comparing this value with a saved value.
@@ -229,9 +265,10 @@ Phaser.TileLayer.prototype = {
     /**
     * Creates a role with the given name.
     *
+    * The name can be subsequently used to assign a role to a Tile with `Tile.roleName` or with `setCell`.
+    *
     * @method Phaser.TileLayer#createTileRole
-    * @private
-    * @todo Not currently supported.
+    * @public
     * @param {string} roleName - The name of the role to create.
     * @return {object} The tile role object (Internal).
     */
@@ -242,12 +279,12 @@ Phaser.TileLayer.prototype = {
         if (!role)
         {
             role = {
-                roleId: this._roles.length,
+                roleId: this._roleData.length,
                 roleName: roleName,
                 properties: {}
             };
 
-            this._roles.push(role);
+            this._roleData.push(role);
             this._rolesByName[roleName] = null;
         }
 
@@ -259,8 +296,7 @@ Phaser.TileLayer.prototype = {
     * Get a tile role with the given name.
     *
     * @method Phaser.TileLayer#getTileRole
-    * @private
-    * @todo Not currently supported.
+    * @protected
     * @param {string} roleName - The name of the role to create.
     * @return {(object|null)} The tile role object (internal) or null.
     */
@@ -271,7 +307,9 @@ Phaser.TileLayer.prototype = {
     },
 
     /**
-    * Get the properties associated with the tile index/type. The properties are shared across the entire `Tilemap`.
+    * Get the properties associated with the tile index/type.
+    *
+    * The properties may be shared across the entire Tilemap or limited to the current Layer depending on `useLayerIndexProperties`. If layer-specific properties are enabled the use the Tilemap properties as a [prototype].
     *
     * @protected
     * @param {integer} tileIndex - Tile index/type to find the properties for.
@@ -280,26 +318,56 @@ Phaser.TileLayer.prototype = {
     */
     getTileIndexProperties: function (tileIndex, ensureProperties) {
 
-        var setid = this.tiles[tileIndex][2];
-        var tileset = this.tilesets[setid];
+        if (this.useLayerIndexProperties) {
 
-        var setCorrectedIndex = tileIndex - tileset.firstgid;
+            var data = this.getTileIndexData(tileIndex, ensureProperties);
 
-        if (setCorrectedIndex < 0 || setCorrectedIndex >= tileset.tileProperties)
+            if (data.indexProperties)
+            {
+                return data.indexProperties;
+            }
+            else if (ensureProperties)
+            {
+                var baseProps = this.tilemap.getTileIndexProperties(tileIndex, true);
+                return (data.indexProperties = Object.create(baseProps));
+            }
+            else
+            {
+                return null;
+            }
+
+        }
+        else
         {
-            //  Can't make up a new tile index ..
+            return this.tilemap.getTileIndexProperties(tileIndex, ensureProperties);
+        }
+
+    },
+
+    /**
+    * Get the properties associated with the tile role. The properties are shared within the layer.
+    *
+    * @protected
+    * @param {integer} roleId - Tile index/type to find the properties for.
+    * @param {boolean} ensureProperties - If true a properties object will be created (and saved) as appropriate.
+    * @return {(object|null)} The properties associated with the index/type of a tile, or null.
+    */
+    getRoleProperties: function (roleId, ensureProperties) {
+
+        var role = this._roleData[roleId];
+        if (!role)
+        {
+            //  No role, no properties
             return null;
         }
 
-        var prop = tileset.tileProperties[setCorrectedIndex];
-        if (prop)
+        if (role.roleProperties)
         {
-            return prop;
+            return role.roleProperties;
         }
-
-        if (ensureProperties)
+        else if (ensureProperties)
         {
-            return (tileset.tileProperties[setCorrectedIndex] = {});
+            return (role.roleProperties = {});
         }
         else
         {
@@ -308,12 +376,14 @@ Phaser.TileLayer.prototype = {
 
     },
 
+
     /**
     * Set a cell. Only the current cell's index (or role/alpha) is changed.
     *
     * This does *not* automatically update the layer collision/metadata. The `refreshLayer` method should be manually called after updating all relevant cells.
     *
-    * This does not affect any per-location callbacks associated with the cell but default rules, including collide falgs, are applied if the tileIndex value of the cell changes.
+    * This does not affect any per-location callbacks or properties associated with the cell.
+    * Default rules, including collide falgs, are applied if the tileIndex value of the cell changes.
     *
     * A negative/non-existant index value (ie. -1) will clear the cell.
     *
@@ -328,8 +398,7 @@ Phaser.TileLayer.prototype = {
 
         if (tileIndex > -1)
         {
-            var tile = this.data[y][x] ||
-                (this.data[y][x] = new Phaser.Tile(this, -1, x, y));
+            var tile = this._ensureTile(x, y);
          
             if (tile.tileIndex !== tileIndex)
             {
@@ -374,8 +443,7 @@ Phaser.TileLayer.prototype = {
         {
             // if (sourceTile.layer !== this) -> bad!
 
-            var tile = this.data[y][x] ||
-                (this.data[y][x] = new Phaser.Tile(this, -1, x, y));
+            var tile = this._ensureTile(x, y);
             
             tile.copyFrom(sourceTile);
 
@@ -384,6 +452,28 @@ Phaser.TileLayer.prototype = {
         else
         {
             this.clearCell(x, y);
+        }
+
+    },
+
+    /**
+    * Used to "ensure" a Tile for a cell. Returns null for cells out of range.
+    * @private
+    */
+    _ensureTile: function (x, y)
+    {
+
+        if (y < 0 || y >= this.data.length) { return null; }
+        var row = this.data[y];
+        if (x < 0 || x >= row.length) { return null; }
+
+        if (row[x])
+        {
+            return row[x];
+        }
+        else
+        {
+            return (row[x] = new Phaser.Tile(this, -1, x, y));
         }
 
     },
@@ -398,7 +488,11 @@ Phaser.TileLayer.prototype = {
     */
     clearCell: function (x, y) {
 
-        this.data[y][x] = null;
+        if (y < 0 || y >= this.data.length) { return; }
+        var row = this.data[y];
+        if (x < 0 || x >= row.length) { return; }
+
+        row[x] = null;
 
         this.changeCount++;
 
@@ -414,42 +508,57 @@ Phaser.TileLayer.prototype = {
     */
     hasCell: function (x, y) {
 
-        var tile = this.data[y][x];
+        if (y < 0 || y >= this.data.length) { return false; }
+        var row = this.data[y];
+        if (x < 0 || x >= row.length) { return false; }
+
+        var tile = row[x];
         
         return tile && tile.tileIndex > -1;
 
     },
 
     /**
-    * Returns a Tile representing the specified location should only be used for a quick read/inspection of a cell. The same Tile object is *not* guaranteed to be returned on subsequent invocations.
+    * Returns a Tile representing the specified cell location.
     *
-    * It is *not* safe for public code to modify the returned Tile or to store it for later use. See `getTileCopy` or `copyToTile` for functions that returns a modification-safe Tile.
+    * This method should only be used for a quick read/inspection of a cell - the Tile object returned *may* be recycled/reused by different implementations. The same Tile object is *not* guaranteed to be returned on subsequent invocations.
+    *
+    * It is *not* safe for public code to modify the returned Tile or to store it for later use. See `getTileCopy` or `copyToTile` for functions that return a copied Tile.
     *
     * @protected
     * @param {integer} x - The cell's x coordinate-component.
     * @param {integer} y - The cell's y coordinate-component.
-    * @returns {(Phaser.Tile|null)} A Tile representing a cell, or null if the cell is non-existant.
+    * @returns {(Phaser.Tile|null)} A Tile representing a cell, or null if the cell is non-existant or the location is invalid.
     */
-    getTile: function (x, y) {
+    getTileRef: function (x, y) {
 
-        return this.data[y][x] || null;
+        if (y < 0 || y >= this.data.length) { return null; }
+        var row = this.data[y];
+        if (x < 0 || x >= row.length) { return null; }
+
+        return row[x] || null;
 
     },
 
     /**
     * Extracts the cell information into a Tile.
     *
-    * The Tile copy can be safely modified; but `setCellFromTile` is required to update the layer data.
+    * The Tile copy can be modified; but `setCellFromTile` is required to update the layer data. If the cell is updated elsewhere, and then from a copied tile, the intermediate changes may be lost.
     *
     * @public
     * @param {integer} x - The cell's x coordinate-component.
     * @param {integer} y - The cell's y coordinate-component.
     * @param {boolean} [forceMaterialize=false] - If true a non-existant tile will be materialzed and returned.
-    * @returns {(Phaser.Tile|null)} The new Tile copy. If the tile is non-existant null is returned.
+    * @returns {(Phaser.Tile|null)} The new Tile copy. Null is returned if the tile is non-existant (and `forceMaterialize` is not true) or the location is invalid.
     */
     getTileCopy: function (x, y, forceMaterialize) {
 
-        var tile = this.data[y][x];
+        if (y < 0 || y >= this.data.length) { return null; }
+        var row = this.data[y];
+        if (x < 0 || x >= row.length) { return null; }
+
+        var tile = row[x];
+
         if (tile)
         {
             var targetTile = new Phaser.Tile(this, -1, x, y);
@@ -469,26 +578,44 @@ Phaser.TileLayer.prototype = {
     },
 
     /**
-    * Extracts the cell information into an existing Tile.
+    * Extracts the cell information into a Tile object.
+    *
+    * The Tile copy can be modified; but `setCellFromTile` is required to update the layer data. If the cell is updated elsewhere, and then from a copied tile, the intermediate changes may be lost.
     *
     * @public
     * @param {integer} x - The cell's x coordinate-component.
     * @param {integer} y - The cell's y coordinate-component.
-    * @param {Phaser.Tile} targetTile - The tile to modify.    
+    * @param {Phaser.Tile} targetTile - The Tile object to modify. This should itself by a new Tile object or a Tile copy; copying to a Tile obtain from `getTileRef` is ill-defined.
+    * @returns {(Phaser.Tile|null)} The `targetTile` (even when the tile is non-existant), or null if the location was invalid.
     */
     copyToTile: function (x, y, targetTile) {
 
         targetTile.x = x;
         targetTile.y = y;
 
-        var tile = this.data[y][x];
+        if (y < 0 || y >= this.data.length)
+        {
+            targetTile.resetToNonExistant();
+            return null;
+        }
+
+        var row = this.data[y];
+        
+        if (x < 0 || x >= row.length) {
+            targetTile.resetToNonExistant();
+            return null;
+        }
+
+        var tile = row[x];
         if (tile)
         {
             targetTile.copyFrom(tile);
+            return targetTile;
         }
         else
         {
             targetTile.resetToNonExistant();
+            return targetTile;
         }
 
     },
@@ -500,51 +627,56 @@ Phaser.TileLayer.prototype = {
     *
     * @public
     * @param {Phaser.Tile} tile - The tile participating in this test.
-    * @param {object} collider - The object being tested for collision against the tile.
+    * @param {object} collider - The object being tested for collision against the tile, usually a physics body.
     * @return {object} The result of invoking the callback should it exist, else "pass".
     */
     doTileIndexCollisionTest: function (tile, collider) {
 
         //  These are in {callback:, callbackContext:} form
-        var rules = this._indexRules[tile.tileIndex];
+        var data = this._indexData[tile.tileIndex];
         
-        if (!rules || !rules.callback)
+        if (!data || !data.collisionTest)
         {
             return "pass";
         }
 
-        return rules.callback.call(rules.callbackContext, collider, tile);
+        return data.collisionTest.call(data.collisionContext, collider, tile);
 
     },
 
     /**
-    * Gets the rule for the given tile index, creating it if requested.
+    * Gets the index-specific data for the given tile index, creating it if requested.
     *
     * @private
-    * @param {integer} tileIndex - The tile index of the rules to fetch.
-    * @param {boolean} autoCreate - If true rules will be created as required.
-    * @return {Phaser.TileLayer#IndexRules} The rule object.
+    * @param {integer} tileIndex - The tile index of the data to fetch.
+    * @param {boolean} autoCreate - If true data will be created as required.
+    * @return {Phaser.TileLayer~IndexData} The data object.
     */
-    getTileIndexRules: function (tileIndex, autoCreate) {
+    getTileIndexData: function (tileIndex, autoCreate) {
 
-        var rule = this._indexRules[tileIndex];
-
-        if (!rule && autoCreate)
+        var data = this._indexData[tileIndex];
+        if (data)
         {
-            rule = this._indexRules[tileIndex] = {
-                // The default face/collision flags
-                defaultCollide: null,
-                callback: null,
-                callbackContext: null
-            };
+            return data;
         }
-
-        return rule;
+        else if (autoCreate)
+        {
+            return (this._indexData[tileIndex] = {
+                defaultCollideMask: null,
+                collisionTest: null,
+                collisionContext: null,
+                indexProperties: null
+            });
+        }
+        else
+        {
+            return null;
+        }
 
     },
 
     /**
-    * Assigns the per-layer collision test/callback for the given indexes. This affects all tiles, present and future, which have the index when performing collision checks.
+    * Assigns the *per-Layer* collision test/callback for the given indexes. This affects all tiles, present and future, which have the index when performing collision checks.
     *
     * @public
     * @param {integer[]} tileIndexes - An array of affected tile indexes.
@@ -558,21 +690,21 @@ Phaser.TileLayer.prototype = {
         for (var i = 0; i < tileIndexes.length; i++) {
             var index = tileIndexes[i];
 
-            var rule = this.getTileIndexRules(index, needsCreate);
-            if (!rule)
+            var data = this.getTileIndexData(index, needsCreate);
+            if (!data)
             {
                 continue;
             }
 
             if (callback)
             {
-                rule.callback = callback;
-                rule.callbackContext = callbackContext;
+                data.collisionTest = callback;
+                data.collisionContext = callbackContext || null;
             }
             else
             {
-                rule.callback = null;
-                rule.callbackContext = null;
+                data.collisionTest = null;
+                data.collisionContext = null;
             }
         }
 
@@ -585,16 +717,16 @@ Phaser.TileLayer.prototype = {
     *
     * @public
     * @param {integer[]} tileIndexes - Array of tile indexes to affect.
-    * @param {number} collideFlags - See Phaser.Tile#tileFlags. Only the collision flag information be changed.
+    * @param {integer} collideFlags - See Phaser.Tile#tileFlags. Only the collision flag information be changed.
     * @param {boolean} [applyImmediate=true] - If true then `refreshLayer(false)` will be applied immediately.
     */
-    setDefaultCollisionRuleForTileIndexes: function (tileIndexes, collideFlags, applyImmediately) {
+    setDefaultCollisionFlags: function (tileIndexes, collideFlags, applyImmediately) {
 
         if (applyImmediately === undefined) { applyImmediately = true; }
 
         //  Don't allow values outside collide mask range and also update flags
-        //  so that the `faces*` flags are also set when applied.
-        collideFlags &= 0x0f;
+        //  so that the `faces*` are also set when applied.
+        collideFlags &= Phaser.Tile.COLLIDE_ALL;
         collideFlags |= (collideFlags << 4);
 
         var needsCreate = collideFlags !== 0;
@@ -602,15 +734,15 @@ Phaser.TileLayer.prototype = {
         for (var i = 0; i < tileIndexes.length; i++) {
             var index = tileIndexes[i];
 
-            var rule = this.getTileIndexRules(index, needsCreate);
-            rule.defaultCollide = collideFlags;
+            var data = this.getTileIndexData(index, needsCreate);
+            data.defaultCollideMask = collideFlags;
 
             this._changeCounts.ruleChanges++;
         }
 
         if (applyImmediately)
         {
-            this.refreshLayer();
+            this.refreshLayer(false);
         }
 
     },
@@ -655,7 +787,7 @@ Phaser.TileLayer.prototype = {
         {
             var row = this.data[y];
 
-            for (var x = 0; x < this.width; x++)
+            for (var x = 0; x < row.length; x++)
             {
                 var tile = row[x];
                 if (!tile)
@@ -673,19 +805,21 @@ Phaser.TileLayer.prototype = {
     },
 
     /**
-    * Applies any default tile-id rules to the given tile.
+    * Applies any default tile-index/type rules to the given tile.
     *
     * @private
     * @param {Phaser.Tile} tile - The tile to apply the rules to.
     */
     applyDefaultTileRules: function (tile) {
 
-        var rules = this._indexRules[tile.tileIndex];
-        if (rules)
+        var data = this._indexData[tile.tileIndex];
+        if (data)
         {
-            if (rules.defaultCollide !== null)
+            if (data.defaultCollideMask !== null)
             {
-                tile.tileFlags |= rules.defaultCollide;
+                tile.tileFlags &= ~Phaser.Tile.COLLIDE_ALL;
+                tile.tileFlags &= ~Phaser.Tile.FACE_ALL;
+                tile.tileFlags |= data.defaultCollideMask;
             }
         }
 
@@ -722,43 +856,39 @@ Phaser.TileLayer.prototype = {
             row = rowBelow;
             rowBelow = this.data[y + 1];
 
-            for (var x = 0, w = this.width; x < w; x++)
+            for (var x = 0; x < row.length; x++)
             {
                 var tile = row[x];
-                if (!tile) {
+                if (!tile || tile.tileIndex < 0) {
                     //  Skip non-existant cells
                     continue;
                 }
 
-                //  Reset all facing data for the tile
-                if (tile.collides)
-                {
-                    tile.faceTop = true;
-                    tile.faceBottom = true;
-                    tile.faceLeft = true;
-                    tile.faceRight = true;
-                }
+                //  Enable a facing flag for every corresponding colliding flag
+                tile.tileFlags &= ~Phaser.Tile.FACE_ALL;
+                tile.tileFlags |= (tile.tileFlags & Phaser.Tile.COLLIDE_ALL) << 4;
 
-                //  Remove faces that are against a tile that has a collision set.
-                //  (Does not consider collision callbacks.)
+                //  Remove faces that are against a tile that has a collision set
+                //  in the same direction. This ensures that only "outside" faces
+                //  are marked after the algorithm completes.
                 
                 n = rowAbove && rowAbove[x];
-                if (n && n.collides) {
+                if (n && n.collideUp) {
                     tile.faceTop = false;
                 }
 
                 n = rowBelow && rowBelow[x];
-                if (n && n.collides) {
+                if (n && n.collideDown) {
                     tile.faceBottom = false;
                 }
 
                 n = row[x - 1];
-                if (n && n.collides) {
+                if (n && n.collideLeft) {
                     tile.faceLeft = false;
                 }
 
                 n = row[x + 1];
-                if (n && n.collides) {
+                if (n && n.collideRight) {
                     tile.faceRight = false;
                 }
             }
@@ -804,9 +934,9 @@ Phaser.TileLayer.prototype = {
     /**
     * Return a flattend array of tiles from the given region.
     *
-    * The tile objects returned should *not* be modified and should *not* have their lifetime extended. (The implementation may or may not return new/fresh Tile objects.)
+    * The tile objects returned should *not* be modified and should *not* have their lifetime extended. The contract for returned Tiles is the same as that for `getTileRef`.
     *
-    * Only Tiles for existing cells are included in the buffer; this includes cells with an index of 0.
+    * Only Tiles for existing cells are included in the buffer - this includes cells with an index of 0, should such be present.
     *
     * @protected
     * @param {integer} x - The x component of the region's top-left corner (in tiles).
@@ -825,16 +955,16 @@ Phaser.TileLayer.prototype = {
 
         x = Math.max(x, 0) | 0;
         y = Math.max(y, 0) | 0;
-        var ex = Math.min(x + width, this.width);
-        var ey = Math.min(y + height, this.height);
+        var endx = Math.min(x + width, this.width);
+        var endy = Math.min(y + height, this.height);
 
         var count = 0;
 
-        for (var ty = y; ty < ey; ty++)
+        for (var ty = y; ty < endy; ty++)
         {
             var row = this.data[ty];
 
-            for (var tx = x; tx < ex && tx < row.length; tx++)
+            for (var tx = x; tx < endx && tx < row.length; tx++)
             {
                 var tile = row[tx];
 
@@ -875,7 +1005,7 @@ Phaser.TileLayer.prototype = {
     * @param {integer} height - The height of region (in tiles).
     * @param {(Phaser.Tile[]|null)} buffer - The array to use, otherwise a new array is created. The size of the array is trimmed if it was previously too large.
     * @param {boolean} forceMaterialize - If true non-existant cells will be materialzed.
-    * @param {boolean} forceCopy - If true all Tile's are guaranteed to be mutation-safe; a copy may be made even if false and Tiles must always be explicitly updated.
+    * @param {boolean} forceCopy - If true all Tile's are copies (not "references"). A copy may be made even if false and Tiles obtained via this method must always be explicitly updated. This also ensures the copies are disconnected (see {@link Phaser.Tile#copyFrom}).
     * @return {Phaser.Tile[]} An array of Phaser.Tiles.
     */
     getTilesEx: function (x, y, width, height, buffer, forceMaterialize, forceCopy) {
@@ -906,7 +1036,7 @@ Phaser.TileLayer.prototype = {
                 }
                 else if (tile && forceCopy)
                 {
-                    tile = (new Phaser.Tile(this, -1, tx, ty)).copyFrom(tile);
+                    tile = tile.clone(true);
                 }
 
                 if (count < buffer.length)
@@ -975,12 +1105,12 @@ Phaser.TileLayer.prototype = {
             this.setCellFromTile(tile.x, tile.y, tile);
         }
 
-        this.refreshLayer();
+        this.refreshLayer(false);
 
     },
 
     /**
-    * Create a copy of the cells/tiles within a region. To transform a region use {@link Phaser.TileLayer#transformRegion transformRegion} instead of a copy-transform-paste operation. To iterate a region without making any changes use {@link Phaser.TileLayer#getTilesEx getTilesEx}.
+    * Create a copy of the cells/tiles within a region. To transform a region use {@link Phaser.TileLayer#transformRegion transformRegion} instead of a copy-transform-paste operation. To iterate a region without making any changes use {@link Phaser.TileLayer#getTilesEx}.
     *
     * The resulting copied tiles/information has a `tiles` property which is an array of the tiles.
     *
@@ -1060,9 +1190,29 @@ Phaser.TileLayer.prototype = {
             ty++;
         }
 
-        this.refreshLayer();
+        this.refreshLayer(false);
 
         return (copyData.width * copyData.height) === pasteCount;
+
+    },
+
+    /**
+    * Remove all physic bodies from `bodies`, invoking destroy upon them if specified.
+    *
+    * @public
+    * @param {boolean} [destroy=true] - If true then `destroy` is invoked upon each removed body.
+    */
+    removeBodies: function (destroy) {
+
+        if (destroy === undefined) { destroy = true; }
+
+        while (this.bodies.length)
+        {
+            var body = this.bodies.pop();
+            if (destroy) {
+                body.destroy();
+            }
+        }
 
     },
 
@@ -1076,14 +1226,14 @@ Phaser.TileLayer.prototype = {
     * @param {number} ry - The render-relative y coordinate component (in pixels).
     * @return {boolean} True if the coordinates are within the specified cell/tile location, otherwise false.
     */
-    cellContainsPoint: function (x, y, rx, ry) {
+    cellContainsCoordinate: function (x, y, rx, ry) {
 
         var wx = x * this.tileWidth;
         var wy = y * this.tileHeight;
 
         return (
             rx >= wx &&
-            ry <= wy &&
+            ry >= wy &&
             rx <= (wx + this.tileWidth) &&
             ry <= (wy + this.tileHeight)
         );
@@ -1122,6 +1272,8 @@ Phaser.TileLayer.prototype = {
     * @protected
     */
     destroy: function () {
+
+        this.removeBodies(true);
 
         this.data = null;
         this.index = -1;
@@ -1176,13 +1328,13 @@ Object.defineProperty(Phaser.TileLayer.prototype, "suppressRefresh", {
         return this._suppressRefresh;
     },
 
-    set: function (value) {
-        if (value && !this._suppressRefresh)
+    set: function (suppress) {
+        if (suppress && !this._suppressRefresh)
         {
             //  Enable suppression
             this._suppressRefresh = true;
         }
-        else if (!value && this._suppressRefresh)
+        else if (!suppress && this._suppressRefresh)
         {
             //  Disable suppression
             this._suppressRefresh = false;
