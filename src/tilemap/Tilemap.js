@@ -436,7 +436,7 @@ Phaser.Tilemap.prototype = {
             return;
         }
 
-        var tilemapLayer = new Phaser.TilemapLayer(this.game, this, layer.layerIndex, width, height);
+        var tilemapLayer = this.createRenderer(layer, width, height);
         tilemapLayer.name = layerKey;  // As good as any..
         
         if (group)
@@ -445,6 +445,18 @@ Phaser.Tilemap.prototype = {
         }
 
         return tilemapLayer;
+
+    },
+
+    /**
+    * Create the appropriate display object / renderer.
+    * @method
+    * @private
+    */
+    createRenderer: function (layer, width, height) {
+
+        return new Phaser.TilemapSpriteRenderer(this.game, this, layer.layerIndex, width, height);
+        // return new Phaser.TilemapLayer(this.game, this, layer.layerIndex, width, height);
 
     },
 
@@ -477,10 +489,10 @@ Phaser.Tilemap.prototype = {
         this.currentLayer = this.layers.length - 1;
 
         //  Might be more appropriate to be  w * layer.tileWidth, etc.
-        var w = Phaser.Math.clamp(layer.widthInPixels, 0, this.game.width);
-        var h = Phaser.Math.clamp(layer.heightInPixels, 0, this.game.height);
+        width = Phaser.Math.clamp(layer.widthInPixels, 0, this.game.width);
+        height = Phaser.Math.clamp(layer.heightInPixels, 0, this.game.height);
 
-        var tilemapLayer = new Phaser.TilemapLayer(this.game, this, layer.layerIndex, w, h);
+        var tilemapLayer = this.createRenderer(layer, width, height);
         tilemapLayer.name = name;
         
         if (group)
@@ -1581,6 +1593,27 @@ Phaser.Tilemap.prototype = {
         this.data = [];
         this.game = null;
 
+    }
+
+};
+
+/**
+ * Gets the tileset that is responsbile for the give tile ID.
+ *
+ * @method
+ * @param tileId {Number} The id of the tile to find the tileset for
+ * @return {TiledTileset} Returns the tileset if found, undefined if not
+ */
+Phaser.Tilemap.prototype.getTileset = function (tileId) {
+
+    var setMap = this.tiles[tileId];
+    if (setMap)
+    {
+        return this.tilesets[setMap[2]];
+    }
+    else
+    {
+        return null;
     }
 
 };
