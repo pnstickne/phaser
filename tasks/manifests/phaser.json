@@ -104,6 +104,7 @@
 
     "src/tilemap/Tile.js",
     "src/tilemap/Tilemap.js",
+    "src/tilemap/TileLayer.js",
     "src/tilemap/TilemapLayer.js",
     "src/tilemap/TilemapParser.js",
     "src/tilemap/Tileset.js",

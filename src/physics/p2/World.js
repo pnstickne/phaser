@@ -1505,21 +1505,15 @@ Phaser.Physics.P2.prototype = {
     * Clears all physics bodies from the given TilemapLayer that were created with `World.convertTilemap`.
     *
     * @method Phaser.Physics.P2#clearTilemapLayerBodies
+    * @deprecated TileLayer has direct `removeBodies` support.
+    * @protected
     * @param {Phaser.Tilemap} map - The Tilemap to get the map data from.
     * @param {number|string|Phaser.TilemapLayer} [layer] - The layer to operate on. If not given will default to map.currentLayer.
     */
-    clearTilemapLayerBodies: function (map, layer) {
+    clearTilemapLayerBodies: function (map, layerKey) {
 
-        layer = map.getLayer(layer);
-
-        var i = map.layers[layer].bodies.length;
-
-        while (i--)
-        {
-            map.layers[layer].bodies[i].destroy();
-        }
-
-        map.layers[layer].bodies.length = 0;
+        var layer = map.getTileLayer(layerKey);
+        layer.removeBodies(true);
 
     },
 
@@ -1536,79 +1530,81 @@ Phaser.Physics.P2.prototype = {
     * @param {boolean} [optimize=true] - If true adjacent colliding tiles will be combined into a single body to save processing. However it means you cannot perform specific Tile to Body collision responses.
     * @return {array} An array of the Phaser.Physics.P2.Body objects that were created.
     */
-    convertTilemap: function (map, layer, addToWorld, optimize) {
-
-        layer = map.getLayer(layer);
+    convertTilemap: function (map, layerKey, addToWorld, optimize) {
 
         if (typeof addToWorld === 'undefined') { addToWorld = true; }
         if (typeof optimize === 'undefined') { optimize = true; }
 
-        //  If the bodies array is already populated we need to nuke it
-        this.clearTilemapLayerBodies(map, layer);
+        var layer = map.getTileLayer(layerKey);
+
+        layer.removeBodies(true);
 
         var width = 0;
         var sx = 0;
         var sy = 0;
 
-        for (var y = 0, h = map.layers[layer].height; y < h; y++)
+        var tileWidth = layer.tileWidth;
+        var tileHeight = layer.tileHeight;
+
+        for (var y = 0, h = layer.height; y < h; y++)
         {
             width = 0;
 
-            for (var x = 0, w = map.layers[layer].width; x < w; x++)
+            for (var x = 0, w = layer.width; x < w; x++)
             {
-                var tile = map.layers[layer].data[y][x];
+                var tile = layer.getTileRef(x, y);
 
                 if (tile && tile.index > -1 && tile.collides)
                 {
                     if (optimize)
                     {
-                        var right = map.getTileRight(layer, x, y);
+                        var right = layer.getTileRef(x + 1, y);
 
                         if (width === 0)
                         {
-                            sx = tile.x * tile.width;
-                            sy = tile.y * tile.height;
-                            width = tile.width;
+                            sx = x * tileWidth;
+                            sy = y * tileHeight;
+                            width = tileWidth;
                         }
 
                         if (right && right.collides)
                         {
-                            width += tile.width;
+                            width += tileWidth;
                         }
                         else
                         {
                             var body = this.createBody(sx, sy, 0, false);
 
-                            body.addRectangle(width, tile.height, width / 2, tile.height / 2, 0);
+                            body.addRectangle(width, tileHeight, width / 2, tileHeight / 2, 0);
 
                             if (addToWorld)
                             {
                                 this.addBody(body);
                             }
 
-                            map.layers[layer].bodies.push(body);
+                            layer.bodies.push(body);
 
                             width = 0;
                         }
                     }
                     else
                     {
-                        var body = this.createBody(tile.x * tile.width, tile.y * tile.height, 0, false);
+                        var body = this.createBody(x * tileWidth, y * tileHeight, 0, false);
 
-                        body.addRectangle(tile.width, tile.height, tile.width / 2, tile.height / 2, 0);
+                        body.addRectangle(tileWidth, tileHeight, tileWidth / 2, tileHeight / 2, 0);
 
                         if (addToWorld)
                         {
                             this.addBody(body);
                         }
 
-                        map.layers[layer].bodies.push(body);
+                        layer.bodies.push(body);
                     }
                 }
             }
         }
 
-        return map.layers[layer].bodies;
+        return layer.bodies;
 
     },
 
