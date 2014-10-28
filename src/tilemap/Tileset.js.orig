@@ -117,8 +117,6 @@ Phaser.Tileset = function (name, firstgid, width, height, margin, spacing, prope
 
     /**
     * Base texture. Created on-demand by a texture lookup.
-    * @member {?PIXI.BaseTexture}
-    * @private
     */
     this.baseTexture = null;
 
@@ -153,6 +151,7 @@ Phaser.Tileset.prototype = {
                 this.tileWidth,
                 this.tileHeight
             );
+<<<<<<< HEAD
         }
 
     },
@@ -173,6 +172,10 @@ Phaser.Tileset.prototype = {
         var textureIndex = tileId - this.firstgid;
         return this.textures[textureIndex] || null;
 
+=======
+        }
+
+>>>>>>> wip-tilelayer
     },
 
     /**
@@ -200,10 +203,13 @@ Phaser.Tileset.prototype = {
     setImage: function (image) {
 
         this.image = image;
+<<<<<<< HEAD
         if (this.baseTexture) {
             this.baseTexture = new PIXI.BaseTexture(this.image);
         }
 
+=======
+>>>>>>> wip-tilelayer
         this.updateTileData();
        
     },
@@ -219,6 +225,22 @@ Phaser.Tileset.prototype = {
 
         this.tileMargin = margin | 0;
         this.tileSpacing = spacing | 0;
+<<<<<<< HEAD
+
+        this.updateTileData();
+
+    },
+
+    /**
+    * Updates tile coordinates and tileset data.
+    *    
+    * @protected
+    */
+    updateTileData: function () {
+
+        var image = this.image;
+=======
+>>>>>>> wip-tilelayer
 
         this.updateTileData();
 
@@ -236,8 +258,11 @@ Phaser.Tileset.prototype = {
         this.columns = Math.round((image.width - this.tileMargin) / (this.tileWidth + this.tileSpacing));
         this.total = this.rows * this.columns;
 
+<<<<<<< HEAD
         var updateTextures = !!this.baseTexture;
 
+=======
+>>>>>>> wip-tilelayer
         this.drawCoords.length = 0;
         if (updateTextures)
         {
@@ -253,6 +278,7 @@ Phaser.Tileset.prototype = {
             {
                 this.drawCoords.push(tx);
                 this.drawCoords.push(ty);
+<<<<<<< HEAD
 
                 if (updateTextures)
                 {
@@ -261,6 +287,8 @@ Phaser.Tileset.prototype = {
                     this.textures.push(texture);
                 }
 
+=======
+>>>>>>> wip-tilelayer
                 tx += this.tileWidth + this.tileSpacing;
             }
 

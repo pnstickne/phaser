@@ -455,8 +455,12 @@ Phaser.Tilemap.prototype = {
     */
     createRenderer: function (layer, width, height) {
 
-        return new Phaser.TilemapSpriteRenderer(this.game, this, layer.layerIndex, width, height);
-        // return new Phaser.TilemapLayer(this.game, this, layer.layerIndex, width, height);
+        var res = window.prompt("Which renderer? (s = sprite, c/other = canvas");
+        if (res.trim().toLowerCase() == "s") {
+            return new Phaser.TilemapSpriteRenderer(this.game, this, layer.layerIndex, width, height);
+        } else {
+            return new Phaser.TilemapCanvasRenderer(this.game, this, layer.layerIndex, width, height);
+        }
 
     },
 

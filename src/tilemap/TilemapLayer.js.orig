@@ -5,20 +5,32 @@
 */
 
 /**
+<<<<<<< HEAD
+* TilemapLayer is an obsolete alias to TilemapCanvasRenderer.
+=======
 * A TilemapLayer is a Phaser.Image/Sprite that renders a specific TileLayer of a Tilemap.
 *
 * Since a TilemapLayer is a Sprite it can be moved around the display, added to other groups or display objects, etc.
+>>>>>>> wip-tilelayer
 *
 * @class Phaser.TilemapCanvasRenderer
 * @extends {Phaser.Image}
 * @constructor
 * @param {Phaser.Game} game - Game reference to the currently running game.
 * @param {Phaser.Tilemap} tilemap - The tilemap to which this layer belongs.
+<<<<<<< HEAD
+* @param {number} index - The layer index within the map that this TilemapLayer represents.
+* @param {number} width - Width of the renderable area of the layer.
+* @param {number} height - Height of the renderable area of the layer.
+* @obsolete See {@link Phaser.TilemapCanvasRenderer}
+*/
+Phaser.TilemapLayer = Phaser.TilemapCanvasRenderer;
+=======
 * @param {integer} index - The index of the TileLayer to render within the Tilemap.
 * @param {integer} width - Width of the renderable area of the layer (in pixels).
 * @param {integer} height - Height of the renderable area of the layer (in pixels).
 */
-Phaser.TilemapCanvasRenderer = function (game, tilemap, index, width, height) {
+Phaser.TilemapLayer = function (game, tilemap, index, width, height) {
 
     width |= 0;
     height |= 0;
@@ -257,18 +269,18 @@ Phaser.TilemapCanvasRenderer = function (game, tilemap, index, width, height) {
 
 };
 
-Phaser.TilemapCanvasRenderer.prototype = Object.create(Phaser.Image.prototype);
-Phaser.TilemapCanvasRenderer.prototype.constructor = Phaser.TilemapCanvasRenderer;
+Phaser.TilemapLayer.prototype = Object.create(Phaser.Image.prototype);
+Phaser.TilemapLayer.prototype.constructor = Phaser.TilemapLayer;
 
 /**
 * The index of this layer (`layer`) within the Tilemap.
 *
 * @member {integer} #index
-* @memberof Phaser.TilemapCanvasRenderer
+* @memberof Phaser.TilemapLayer
 * @readonly
 * @protected
 */
-Object.defineProperty(Phaser.TilemapCanvasRenderer.prototype, 'index', {
+Object.defineProperty(Phaser.TilemapLayer.prototype, 'index', {
 
     get: function () {
         return this.layer.layerIndex;
@@ -282,11 +294,11 @@ Object.defineProperty(Phaser.TilemapCanvasRenderer.prototype, 'index', {
 * Set to `null` to disable rendering anything for tiles without value tileset images.
 *
 * @member {?string} #tileColor
-* @memberof Phaser.TilemapCanvasRenderer
+* @memberof Phaser.TilemapLayer
 * @default 'rgb(255, 255, 255)'
 * @deprecated Use `debugSettings.missingImageFill` instead.
 */
-Object.defineProperty(Phaser.TilemapCanvasRenderer.prototype, 'tileColor', {
+Object.defineProperty(Phaser.TilemapLayer.prototype, 'tileColor', {
 
     get: function () {
         return this.debugSettings.missingImageFill;
@@ -302,7 +314,7 @@ Object.defineProperty(Phaser.TilemapCanvasRenderer.prototype, 'tileColor', {
 *
 * @protected
 */
-Phaser.TilemapCanvasRenderer.prototype.postUpdate = function () {
+Phaser.TilemapLayer.prototype.postUpdate = function () {
 
     Phaser.Image.prototype.postUpdate.call(this);
 
@@ -333,7 +345,7 @@ Phaser.TilemapCanvasRenderer.prototype.postUpdate = function () {
 *
 * @public
 */
-Phaser.TilemapCanvasRenderer.prototype.resizeWorld = function () {
+Phaser.TilemapLayer.prototype.resizeWorld = function () {
 
     this.game.world.setBounds(0, 0, this.layer.widthInPixels, this.layer.heightInPixels);
 
@@ -346,7 +358,7 @@ Phaser.TilemapCanvasRenderer.prototype.resizeWorld = function () {
 * @param {number} x - x coordinate in camera space
 * @return {number} x coordinate in scrollFactor-adjusted dimensions
 */
-Phaser.TilemapCanvasRenderer.prototype._fixX = function (x) {
+Phaser.TilemapLayer.prototype._fixX = function (x) {
 
     if (x < 0)
     {
@@ -369,7 +381,7 @@ Phaser.TilemapCanvasRenderer.prototype._fixX = function (x) {
 * @param {number} x - x coordinate in scrollFactor-adjusted dimensions
 * @return {number} x coordinate in camera space
 */
-Phaser.TilemapCanvasRenderer.prototype._unfixX = function (x) {
+Phaser.TilemapLayer.prototype._unfixX = function (x) {
 
     if (this.scrollFactorX === 1)
     {
@@ -387,7 +399,7 @@ Phaser.TilemapCanvasRenderer.prototype._unfixX = function (x) {
 * @param {number} y - y coordinate in camera space
 * @return {number} y coordinate in scrollFactor-adjusted dimensions
 */
-Phaser.TilemapCanvasRenderer.prototype._fixY = function (y) {
+Phaser.TilemapLayer.prototype._fixY = function (y) {
 
     if (y < 0)
     {
@@ -410,7 +422,7 @@ Phaser.TilemapCanvasRenderer.prototype._fixY = function (y) {
 * @param {number} y - y coordinate in scrollFactor-adjusted dimensions
 * @return {number} y coordinate in camera space
 */
-Phaser.TilemapCanvasRenderer.prototype._unfixY = function (y) {
+Phaser.TilemapLayer.prototype._unfixY = function (y) {
 
     if (this.scrollFactorY === 1)
     {
@@ -428,7 +440,7 @@ Phaser.TilemapCanvasRenderer.prototype._unfixY = function (y) {
 * @param {number} x - X position of the point in target tile (in pixels).
 * @return {integer} The X map location of the tile.
 */
-Phaser.TilemapCanvasRenderer.prototype.getTileX = function (x) {
+Phaser.TilemapLayer.prototype.getTileX = function (x) {
 
     // var tileWidth = this.tileWidth * this.scale.x;
     return Math.floor(this._fixX(x) / this._mc.tileWidth);
@@ -442,7 +454,7 @@ Phaser.TilemapCanvasRenderer.prototype.getTileX = function (x) {
 * @param {number} y - Y position of the point in target tile (in pixels).
 * @return {integer} The Y map location of the tile.
 */
-Phaser.TilemapCanvasRenderer.prototype.getTileY = function (y) {
+Phaser.TilemapLayer.prototype.getTileY = function (y) {
 
     // var tileHeight = this.tileHeight * this.scale.y;
     return Math.floor(this._fixY(y) / this._mc.tileHeight);
@@ -458,7 +470,7 @@ Phaser.TilemapCanvasRenderer.prototype.getTileY = function (y) {
 * @param {(Phaser.Point|object)} point - The Point/object to update.
 * @return {(Phaser.Point|object)} A Point/object with its `x` and `y` properties set.
 */
-Phaser.TilemapCanvasRenderer.prototype.getTileXY = function (x, y, point) {
+Phaser.TilemapLayer.prototype.getTileXY = function (x, y, point) {
 
     point.x = this.getTileX(x);
     point.y = this.getTileY(y);
@@ -477,7 +489,7 @@ Phaser.TilemapCanvasRenderer.prototype.getTileXY = function (x, y, point) {
 * @param {boolean} [interestingFace=false] - If true, _only_ return tiles that have interesting faces.
 * @return {Phaser.Tile[]} An array of Phaser.Tiles.
 */
-Phaser.TilemapCanvasRenderer.prototype.getRayCastTiles = function (line, stepRate, collides, interestingFace) {
+Phaser.TilemapLayer.prototype.getRayCastTiles = function (line, stepRate, collides, interestingFace) {
 
     if (!stepRate) { stepRate = this.rayStepRate; }
     if (typeof collides === 'undefined') { collides = false; }
@@ -525,7 +537,7 @@ Phaser.TilemapCanvasRenderer.prototype.getRayCastTiles = function (line, stepRat
 * @param {boolean} [interestingFace=false] - If true, _only_ return tiles that have interesting faces.
 * @return {array<Phaser.Tile>} An array of Tiles.
 */
-Phaser.TilemapCanvasRenderer.prototype.getTiles = function (x, y, width, height, collides, interestingFace) {
+Phaser.TilemapLayer.prototype.getTiles = function (x, y, width, height, collides, interestingFace) {
 
     //  Should we only get tiles that have at least one of their collision flags set? (true = yes, false = no just get them all)
     if (typeof collides === 'undefined') { collides = false; }
@@ -575,11 +587,11 @@ Phaser.TilemapCanvasRenderer.prototype.getTiles = function (x, y, width, height,
 * Flag controlling if the layer tiles wrap at the edges. Only works if the World size matches the Map size.
 *
 * @member {boolean} #wrap
-* @memberof Phaser.TilemapCanvasRenderer
+* @memberof Phaser.TilemapLayer
 * @public
 * @default false
 */
-Object.defineProperty(Phaser.TilemapCanvasRenderer.prototype, "wrap", {
+Object.defineProperty(Phaser.TilemapLayer.prototype, "wrap", {
 
     get: function () {
         return this._wrap;
@@ -599,7 +611,7 @@ Object.defineProperty(Phaser.TilemapCanvasRenderer.prototype, "wrap", {
 * @param {integer} Tile index
 * @return {Phaser.Tileset|null} Returns the associated tileset or null if there is no such mapping.
 */
-Phaser.TilemapCanvasRenderer.prototype.resolveTileset = function (tileIndex)
+Phaser.TilemapLayer.prototype.resolveTileset = function (tileIndex)
 {
     var tilesets = this._mc.tilesets;
 
@@ -630,7 +642,7 @@ Phaser.TilemapCanvasRenderer.prototype.resolveTileset = function (tileIndex)
 *
 * @public
 */
-Phaser.TilemapCanvasRenderer.prototype.resetTilesetCache = function ()
+Phaser.TilemapLayer.prototype.resetTilesetCache = function ()
 {
 
     var tilesets = this._mc.tilesets;
@@ -648,7 +660,7 @@ Phaser.TilemapCanvasRenderer.prototype.resetTilesetCache = function ()
 * @param {integer} x
 * @param {integer} y
 */
-Phaser.TilemapCanvasRenderer.prototype.shiftCanvas = function (context, x, y)
+Phaser.TilemapLayer.prototype.shiftCanvas = function (context, x, y)
 {
 
     var canvas = context.canvas;
@@ -691,7 +703,7 @@ Phaser.TilemapCanvasRenderer.prototype.shiftCanvas = function (context, x, y)
 * @param {integer} right - Rightmost column to render.
 * @param {integer} bottom - Bottommost row to render.
 */
-Phaser.TilemapCanvasRenderer.prototype.renderRegion = function (scrollX, scrollY, left, top, right, bottom) {
+Phaser.TilemapLayer.prototype.renderRegion = function (scrollX, scrollY, left, top, right, bottom) {
 
     var context = this.context;
 
@@ -796,7 +808,7 @@ Phaser.TilemapCanvasRenderer.prototype.renderRegion = function (scrollX, scrollY
 *
 * @private
 */
-Phaser.TilemapCanvasRenderer.prototype.renderDeltaScroll = function (shiftX, shiftY) {
+Phaser.TilemapLayer.prototype.renderDeltaScroll = function (shiftX, shiftY) {
 
     var scrollX = this._mc.scrollX;
     var scrollY = this._mc.scrollY;
@@ -871,7 +883,7 @@ Phaser.TilemapCanvasRenderer.prototype.renderDeltaScroll = function (shiftX, shi
 *
 * @private
 */
-Phaser.TilemapCanvasRenderer.prototype.renderFull = function ()
+Phaser.TilemapLayer.prototype.renderFull = function ()
 {
     
     var scrollX = this._mc.scrollX;
@@ -899,7 +911,7 @@ Phaser.TilemapCanvasRenderer.prototype.renderFull = function ()
 *
 * @protected
 */
-Phaser.TilemapCanvasRenderer.prototype.render = function () {
+Phaser.TilemapLayer.prototype.render = function () {
 
     var redrawAll = false;
 
@@ -985,7 +997,7 @@ Phaser.TilemapCanvasRenderer.prototype.render = function () {
 *
 * @private
 */
-Phaser.TilemapCanvasRenderer.prototype.renderDebug = function () {
+Phaser.TilemapLayer.prototype.renderDebug = function () {
 
     var scrollX = this._mc.scrollX;
     var scrollY = this._mc.scrollY;
@@ -1083,10 +1095,10 @@ Phaser.TilemapCanvasRenderer.prototype.renderDebug = function () {
 * Scrolls the map horizontally or returns the current x position.
 *
 * @member {number} #scrollX
-* @memberof Phaser.TilemapCanvasRenderer
+* @memberof Phaser.TilemapLayer
 * @public
 */
-Object.defineProperty(Phaser.TilemapCanvasRenderer.prototype, "scrollX", {
+Object.defineProperty(Phaser.TilemapLayer.prototype, "scrollX", {
 
     get: function () {
         return this._scrollX;
@@ -1102,10 +1114,10 @@ Object.defineProperty(Phaser.TilemapCanvasRenderer.prototype, "scrollX", {
 * Scrolls the map vertically or returns the current y position.
 *
 * @member {number} #scrollY
-* @memberof Phaser.TilemapCanvasRenderer
+* @memberof Phaser.TilemapLayer
 * @public
 */
-Object.defineProperty(Phaser.TilemapCanvasRenderer.prototype, "scrollY", {
+Object.defineProperty(Phaser.TilemapLayer.prototype, "scrollY", {
 
     get: function () {
         return this._scrollY;
@@ -1121,10 +1133,10 @@ Object.defineProperty(Phaser.TilemapCanvasRenderer.prototype, "scrollY", {
 * The width of the collision tiles (in pixels).
 *
 * @member {number} #collisionWidth
-* @memberof Phaser.TilemapCanvasRenderer
+* @memberof Phaser.TilemapLayer
 * @public
 */
-Object.defineProperty(Phaser.TilemapCanvasRenderer.prototype, "collisionWidth", {
+Object.defineProperty(Phaser.TilemapLayer.prototype, "collisionWidth", {
 
     get: function () {
         return this._mc.cw;
@@ -1141,10 +1153,10 @@ Object.defineProperty(Phaser.TilemapCanvasRenderer.prototype, "collisionWidth", 
 * The height of the collision tiles (in pixels).
 *
 * @member {number} #collisionHeight
-* @memberof Phaser.TilemapCanvasRenderer
+* @memberof Phaser.TilemapLayer
 * @public
 */
-Object.defineProperty(Phaser.TilemapCanvasRenderer.prototype, "collisionHeight", {
+Object.defineProperty(Phaser.TilemapLayer.prototype, "collisionHeight", {
 
     get: function () {
         return this._mc.ch;
@@ -1156,3 +1168,4 @@ Object.defineProperty(Phaser.TilemapCanvasRenderer.prototype, "collisionHeight",
     }
 
 });
+>>>>>>> wip-tilelayer
