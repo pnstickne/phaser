@@ -238,12 +238,17 @@ Phaser.RandomDataGenerator.prototype = {
 
     /**
     * Returns a random member of `array`.
+    * Returns `undefined` for an empty array or, if the array only has a single
+    * item, then the sole item is returned without changing the RNG state.
     *
     * @method Phaser.RandomDataGenerator#pick
     * @param {Array} ary - An Array to pick a random member of.
     * @return {any} A random member of the array.
     */
     pick: function (ary) {
+
+        if (!ary.length) { return undefined; }
+        if (ary.length === 1) { return ary[0]; }
 
         return ary[this.integerInRange(0, ary.length - 1)];
 

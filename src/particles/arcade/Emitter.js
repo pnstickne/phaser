@@ -235,7 +235,8 @@ Phaser.Particles.Arcade.Emitter = function (game, x, y, maxParticles) {
     this._explode = true;
 
     /**
-    * @property {any} _frames - Internal helper for the particle frame.
+    * An array of the frame indexes/keys.
+    * @property {mixed[]} _frames
     * @private
     */
     this._frames = null;
@@ -286,7 +287,7 @@ Phaser.Particles.Arcade.Emitter.prototype.update = function () {
 *
 * @method Phaser.Particles.Arcade.Emitter#makeParticles
 * @param {array|string} keys - A string or an array of strings that the particle sprites will use as their texture. If an array one is picked at random.
-* @param {array|number} [frames=0] - A frame number, or array of frames that the sprite will use. If an array one is picked at random.
+* @param {array|number} [frames=0] - A frame number/name (or array of frame numbers/names) that the sprite will use. If an array one is picked at random.
 * @param {number} [quantity] - The number of particles to generate. If not given it will use the value of Emitter.maxParticles.
 * @param {boolean} [collide=false] - If you want the particles to be able to collide with other Arcade Physics bodies then set this to true.
 * @param {boolean} [collideWorldBounds=false] - A particle can be set to collide against the World bounds automatically and rebound back into the World if this is set to true. Otherwise it will leave the World.
@@ -301,21 +302,23 @@ Phaser.Particles.Arcade.Emitter.prototype.makeParticles = function (keys, frames
 
     var particle;
     var i = 0;
-    var rndKey = keys;
-    var rndFrame = frames;
+
+    if (!Array.isArray(keys))
+    {
+        keys = [keys];
+    }
+
+    if (!Array.isArray(frames))
+    {
+        frames = [frames];
+    }
+
     this._frames = frames;
 
-    while (i < quantity)
+    while (i++ < quantity)
     {
-        if (Array.isArray(keys))
-        {
-            rndKey = this.game.rnd.pick(keys);
-        }
-
-        if (Array.isArray(frames))
-        {
-            rndFrame = this.game.rnd.pick(frames);
-        }
+        var rndKey = this.game.rnd.pick(keys);
+        var rndFrame = this.game.rnd.pick(frames);
 
         particle = new this.particleClass(this.game, 0, 0, rndKey, rndFrame);
 
@@ -339,8 +342,6 @@ Phaser.Particles.Arcade.Emitter.prototype.makeParticles = function (keys, frames
         particle.anchor.copyFrom(this.particleAnchor);
 
         this.add(particle);
-
-        i++;
     }
 
     return this;
@@ -489,14 +490,7 @@ Phaser.Particles.Arcade.Emitter.prototype.emitParticle = function () {
         particle.scale.set(this.game.rnd.realInRange(this._minParticleScale.x, this._maxParticleScale.x), this.game.rnd.realInRange(this._minParticleScale.y, this._maxParticleScale.y));
     }
 
-    if (Array.isArray(this._frames === 'object'))
-    {
-        particle.frame = this.game.rnd.pick(this._frames);
-    }
-    else
-    {
-        particle.frame = this._frames;
-    }
+    particle.frame = this.game.rnd.pick(this._frames);
 
     if (this.autoAlpha)
     {
