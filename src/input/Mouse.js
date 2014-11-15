@@ -601,7 +601,8 @@ Object.defineProperty(Phaser.Mouse.prototype, "disabled", {
 *
 * See https://developer.mozilla.org/en-US/docs/Web/Events/mousewheel for choosing a scale and delta mode.
 *
-* @class Phaser.Mouse~WheelEventProxy
+* @alias Phaser.Mouse~WheelEventProxy
+* @class
 * @private
 * @param {number} scaleFactor - Scale factor as applied to wheelDelta/wheelDeltaX or details.
 * @param {integer} deltaMode - The reported delta mode.

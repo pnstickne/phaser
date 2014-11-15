@@ -1875,7 +1875,7 @@ Phaser.ScaleManager.prototype = {
     * Destroys the ScaleManager and removes any event listeners.
     * This should probably only be called when the game is destroyed.
     *
-    * @method destroy
+    * @method Phaser.ScaleManager#destroy
     * @protected
     */
     destroy: function () {
