@@ -1252,15 +1252,33 @@ Phaser.Group.prototype.forEach = function (callback, callbackContext, checkExist
 
     if (typeof checkExists === 'undefined') { checkExists = false; }
 
-    var args = Array.prototype.splice.call(arguments, 3);
-    args.unshift(null);
-
-    for (var i = 0, len = this.children.length; i < len; i++)
+    if (arguments.length <= 3)
     {
-        if (!checkExists || (checkExists && this.children[i].exists))
+        for (var i = 0, len = this.children.length; i < len; i++)
         {
-            args[0] = this.children[i];
-            callback.apply(callbackContext, args);
+            if (!checkExists || (checkExists && this.children[i].exists))
+            {
+                callback.call(callbackContext, this.children[i]);
+            }
+        }
+    }
+    else
+    {
+        // Assigning to arguments properties causes Extreme Deoptimization in Chrome, FF, and IE.
+        // Using an array and pushing each element (not a slice!) is _significantly_ faster.
+        // (V8 docs indicate `Array.prototype.concat.apply([null], arguments)` may be safe from this de-opt.)
+        var args = [null];
+        for (var i = 3; i < arguments.length; i++) {
+            args.push(arguments[i]);
+        }
+
+        for (var i = 0, len = this.children.length; i < len; i++)
+        {
+            if (!checkExists || (checkExists && this.children[i].exists))
+            {
+                args[0] = this.children[i];
+                callback.apply(callbackContext, args);
+            }
         }
     }
 
