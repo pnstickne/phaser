@@ -6,9 +6,15 @@
 
 /**
 * A Point object represents a location in a two-dimensional coordinate system, where x represents the horizontal axis and y represents the vertical axis.
+*
 * The following code creates a point at (0,0):
-* `var myPoint = new Phaser.Point();`
-* You can also use them as 2D Vectors and you'll find different vector related methods in this class.
+*
+*     var myPoint = new Phaser.Point();
+*
+* Points may also be used as 2D Vectors and there are some vector-related methods provided by this this class.
+*
+* A "Point-like" object is an object that exposes numerical `x` and `y` properties; such an object can be used
+* with many of the static Phaser.Point methods.
 * 
 * @class Phaser.Point
 * @constructor
@@ -273,12 +279,13 @@ Phaser.Point.prototype = {
     },
 
     /**
-    * Returns the angle between this Point object and another object with public x and y properties.
+    * Returns the angle of the line segment from this Point to another Point-like object: from `this` to `a`.
     *
     * @method Phaser.Point#angle
-    * @param {Phaser.Point|any} a - The object to get the angle from this Point to.
-    * @param {boolean} [asDegrees=false] - Is the given angle in radians (false) or degrees (true)?
-    * @return {number} The angle between the two objects.
+    * @param {Phaser.Point|object} a - The Point-like object to get the angle from this Point to.
+    * @param {boolean} [asDegrees=false] - Should the angle be returned in degrees? The default is to return radians.
+    * @return {number} The angle between the two objects, in radians (unless `asDegrees` is true).
+    * @see {@link Phaser.Point.angle}
     */
     angle: function (a, asDegrees) {
 
@@ -296,15 +303,16 @@ Phaser.Point.prototype = {
     },
 
     /**
-    * Returns the angle squared between this Point object and another object with public x and y properties.
+    * Returns the angle squared between this Point object and another Point-like object: from `this` to `a`.
     *
     * @method Phaser.Point#angleSq
-    * @param {Phaser.Point|any} a - The object to get the angleSq from this Point to.
-    * @return {number} The angleSq between the two objects.
+    * @param {Phaser.Point|object} a - The Point-like object to get the angleSq from this Point to.
+    * @return {number} The angleSq between the two objects, in radians.
+    * @see {@link Phaser.Point.angleSq}
     */
     angleSq: function (a) {
 
-        return this.subtract(a).angle(a.subtract(this));
+        return Phaser.Point.angleSq(this, a);
 
     },
 
@@ -576,7 +584,8 @@ Phaser.Point.divide = function (a, b, out) {
 };
 
 /**
-* Determines whether the two given Point objects are equal. They are considered equal if they have the same x and y values.
+* Determines whether the two given Point objects are equal.
+* They are considered equal if they have the same x and y values.
 *
 * @method Phaser.Point.equals
 * @param {Phaser.Point} a - The first Point object.
@@ -590,31 +599,31 @@ Phaser.Point.equals = function (a, b) {
 };
 
 /**
-* Returns the angle between two Point objects.
+* Returns the angle of the line segment between two Point-like objects: from `a` to `b`.
 *
 * @method Phaser.Point.angle
-* @param {Phaser.Point} a - The first Point object.
-* @param {Phaser.Point} b - The second Point object.
-* @return {number} The angle between the two Points.
+* @param {Phaser.Point|object} a - The first (starting) Point-like object.
+* @param {Phaser.Point|object} b - The second (ending) Point-like object.
+* @return {number} The angle between the two Points, in radians.
 */
 Phaser.Point.angle = function (a, b) {
 
     // return Math.atan2(a.x * b.y - a.y * b.x, a.x * b.x + a.y * b.y);
-    return Math.atan2(a.y - b.y, a.x - b.x);
+    return Math.atan2(b.y - a.y, b.x - a.x);
 
 };
 
 /**
-* Returns the angle squared between two Point objects.
+* Returns the angle squared between two Point-like objects: from `a` to `b`.
 *
 * @method Phaser.Point.angleSq
-* @param {Phaser.Point} a - The first Point object.
-* @param {Phaser.Point} b - The second Point object.
-* @return {number} The angle squared between the two Points.
+* @param {Phaser.Point|object} a - The first (starting) Point-like object.
+* @param {Phaser.Point|object} b - The second (ending) Point-like object.
+* @return {number} The angle squared between the two Points, in radians.
 */
 Phaser.Point.angleSq = function (a, b) {
 
-    return a.subtract(b).angle(b.subtract(a));
+    return Math.atan2(2 * (b.y - a.y), 2 * (b.x - a.x));
 
 };
 
@@ -656,8 +665,8 @@ Phaser.Point.multiplyAdd = function (a, b, s, out) {
 * Interpolates the two given Points, based on the `f` value (between 0 and 1) and returns a new Point.
 * 
 * @method Phaser.Point.interpolate
-* @param {Phaser.Point} a - The first Point object.
-* @param {Phaser.Point} b - The second Point object.
+* @param {Phaser.Point|object} a - The first Point object.
+* @param {Phaser.Point|object} b - The second Point object.
 * @param {number} f - The level of interpolation between the two points. Indicates where the new point will be, along the line between pt1 and pt2. If f=1, pt1 is returned; if f=0, pt2 is returned.
 * @param {Phaser.Point} [out] - Optional Point to store the value in, if not supplied a new Point object will be created.
 * @return {Phaser.Point} The new Point object.
@@ -674,8 +683,8 @@ Phaser.Point.interpolate = function (a, b, f, out) {
 * Return a perpendicular vector (90 degrees rotation)
 *
 * @method Phaser.Point.perp
-* @param {Phaser.Point} a - The Point object.
-* @param {Phaser.Point} [out] - Optional Point to store the value in, if not supplied a new Point object will be created.
+* @param {Phaser.Point|object} a - A Point-like object representing the original vector.
+* @param {Phaser.Point} [out=(new Point)] - Optional Point to store the value in, if not supplied a new Point object will be created.
 * @return {Phaser.Point} The new Point object.
 */
 Phaser.Point.perp = function (a, out) {
@@ -690,8 +699,8 @@ Phaser.Point.perp = function (a, out) {
 * Return a perpendicular vector (-90 degrees rotation)
 *
 * @method Phaser.Point.rperp
-* @param {Phaser.Point} a - The Point object.
-* @param {Phaser.Point} [out] - Optional Point to store the value in, if not supplied a new Point object will be created.
+* @param {Phaser.Point|object} a - A Point-like object representing the original vector.
+* @param {Phaser.Point} [out=(new Point)] - Optional Point to store the value in, if not supplied a new Point object will be created.
 * @return {Phaser.Point} The new Point object.
 */
 Phaser.Point.rperp = function (a, out) {
@@ -706,8 +715,8 @@ Phaser.Point.rperp = function (a, out) {
 * Returns the distance of this Point object to the given object (can be a Circle, Point or anything with x/y properties).
 *
 * @method Phaser.Point.distance
-* @param {object} a - The target object. Must have visible x and y properties that represent the center of the object.
-* @param {object} b - The target object. Must have visible x and y properties that represent the center of the object.
+* @param {Phaser.Point|object} a - The first object: either a Point-like object where x/y properties denote the start of the distance line-segment.
+* @param {Phaser.Point|object} b - The second object: either a Point-like object where x/y properties denote the end of the distance line-segment.
 * @param {boolean} [round=false] - Round the distance to the nearest integer.
 * @return {number} The distance between this Point object and the destination Point object.
 */
