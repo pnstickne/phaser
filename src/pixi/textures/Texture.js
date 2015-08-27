@@ -5,6 +5,15 @@
 PIXI.TextureCache = {};
 PIXI.FrameCache = {};
 
+/**
+ * TextureSilentFail is a boolean that defaults to `false`. 
+ * If `true` then `PIXI.Texture.setFrame` will no longer throw an error if the texture dimensions are incorrect. 
+ * Instead `Texture.valid` will be set to `false` (#1556)
+ *
+ * @type {boolean}
+ */
+PIXI.TextureSilentFail = false;
+
 PIXI.TextureCacheIdGenerator = 0;
 
 /**
@@ -73,12 +82,28 @@ PIXI.Texture = function(baseTexture, frame, crop, trim)
     this.valid = false;
 
     /**
+     * Is this a tiling texture? As used by the likes of a TilingSprite.
+     *
+     * @property isTiling
+     * @type Boolean
+     */
+    this.isTiling = false;
+
+    /**
      * This will let a renderer know that a texture has been updated (used mainly for webGL uv updates)
      *
      * @property requiresUpdate
      * @type Boolean
      */
     this.requiresUpdate = false;
+
+    /**
+     * This will let a renderer know that a tinted parent has updated its texture.
+     *
+     * @property requiresReTint
+     * @type Boolean
+     */
+    this.requiresReTint = false;
 
     /**
      * The WebGL UV data cache.
@@ -119,14 +144,10 @@ PIXI.Texture = function(baseTexture, frame, crop, trim)
         if (this.noFrame) frame = new PIXI.Rectangle(0, 0, baseTexture.width, baseTexture.height);
         this.setFrame(frame);
     }
-    else
-    {
-        baseTexture.addEventListener('loaded', this.onBaseTextureLoaded.bind(this));
-    }
+
 };
 
 PIXI.Texture.prototype.constructor = PIXI.Texture;
-PIXI.EventTarget.mixin(PIXI.Texture.prototype);
 
 /**
  * Called when the base texture is loaded
@@ -137,13 +158,13 @@ PIXI.EventTarget.mixin(PIXI.Texture.prototype);
 PIXI.Texture.prototype.onBaseTextureLoaded = function()
 {
     var baseTexture = this.baseTexture;
-    baseTexture.removeEventListener('loaded', this.onLoaded);
 
-    if (this.noFrame) this.frame = new PIXI.Rectangle(0, 0, baseTexture.width, baseTexture.height);
+    if (this.noFrame)
+    {
+        this.frame = new PIXI.Rectangle(0, 0, baseTexture.width, baseTexture.height);
+    }
 
     this.setFrame(this.frame);
-
-    this.dispatchEvent( { type: 'update', content: this } );
 };
 
 /**
@@ -180,7 +201,13 @@ PIXI.Texture.prototype.setFrame = function(frame)
 
     if (!this.trim && (frame.x + frame.width > this.baseTexture.width || frame.y + frame.height > this.baseTexture.height))
     {
-        throw new Error('Texture Error: frame does not fit inside the base Texture dimensions ' + this);
+        if (!PIXI.TextureSilentFail)
+        {
+            throw new Error('Texture Error: frame does not fit inside the base Texture dimensions ' + this);
+        }
+
+        this.valid = false;
+        return;
     }
 
     this.valid = frame && frame.width && frame.height && this.baseTexture.source && this.baseTexture.hasLoaded;
@@ -232,7 +259,7 @@ PIXI.Texture.prototype._updateUvs = function()
  * @method fromImage
  * @param imageUrl {String} The image url of the texture
  * @param crossorigin {Boolean} Whether requests should be treated as crossorigin
- * @param scaleMode {Number} Should be one of the PIXI.scaleMode consts
+ * @param scaleMode {Number} See {{#crossLink "PIXI/scaleModes:property"}}PIXI.scaleModes{{/crossLink}} for possible values
  * @return Texture
  */
 PIXI.Texture.fromImage = function(imageUrl, crossorigin, scaleMode)
@@ -270,15 +297,14 @@ PIXI.Texture.fromFrame = function(frameId)
  * @static
  * @method fromCanvas
  * @param canvas {Canvas} The canvas element source of the texture
- * @param scaleMode {Number} Should be one of the PIXI.scaleMode consts
+ * @param scaleMode {Number} See {{#crossLink "PIXI/scaleModes:property"}}PIXI.scaleModes{{/crossLink}} for possible values
  * @return Texture
  */
 PIXI.Texture.fromCanvas = function(canvas, scaleMode)
 {
     var baseTexture = PIXI.BaseTexture.fromCanvas(canvas, scaleMode);
 
-    return new PIXI.Texture( baseTexture );
-
+    return new PIXI.Texture(baseTexture);
 };
 
 /**

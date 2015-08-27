@@ -1,6 +1,6 @@
 /**
 * @author       Richard Davey <rich@photonstorm.com>
-* @copyright    2014 Photon Storm Ltd.
+* @copyright    2015 Photon Storm Ltd.
 * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
 */
 
@@ -131,10 +131,10 @@ Phaser.Physics.Ninja.prototype = {
     */
     enable: function (object, type, id, radius, children) {
 
-        if (typeof type === 'undefined') { type = 1; }
-        if (typeof id === 'undefined') { id = 1; }
-        if (typeof radius === 'undefined') { radius = 0; }
-        if (typeof children === 'undefined') { children = true; }
+        if (type === undefined) { type = 1; }
+        if (id === undefined) { id = 1; }
+        if (radius === undefined) { radius = 0; }
+        if (children === undefined) { children = true; }
 
         if (Array.isArray(object))
         {
@@ -252,8 +252,8 @@ Phaser.Physics.Ninja.prototype = {
     *
     * @method Phaser.Physics.Ninja#convertTilemap
     * @param {Phaser.Tilemap} map - The Tilemap to get the map data from.
-    * @param {number|string|Phaser.TilemapLayer} [layer] - The layer to operate on. If not given will default to map.currentLayer.
-    * @param {object} [slopeMap] - The tilemap index to Tile ID map.
+    * @param {number|string|Phaser.TilemapLayer} layer - The layer to operate on. If not given will default to map.currentLayer.
+    * @param {object} slopeMap - The tilemap index to Tile ID map.
     * @return {array} An array of the Phaser.Physics.Ninja.Tile objects that were created.
     */
     convertTilemap: function (map, layerKey, slopeMap) {
@@ -378,7 +378,7 @@ Phaser.Physics.Ninja.prototype = {
     collideHandler: function (object1, object2, collideCallback, processCallback, callbackContext, overlapOnly) {
 
         //  Only collide valid objects
-        if (typeof object2 === 'undefined' && (object1.type === Phaser.GROUP || object1.type === Phaser.EMITTER))
+        if (object2 === undefined && (object1.type === Phaser.GROUP || object1.type === Phaser.EMITTER))
         {
             this.collideGroupVsSelf(object1, collideCallback, processCallback, callbackContext, overlapOnly);
             return;

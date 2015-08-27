@@ -29,7 +29,7 @@
  * @param width {Number} The width of the render texture
  * @param height {Number} The height of the render texture
  * @param renderer {CanvasRenderer|WebGLRenderer} The renderer used for this RenderTexture
- * @param scaleMode {Number} Should be one of the PIXI.scaleMode consts
+ * @param scaleMode {Number} See {{#crossLink "PIXI/scaleModes:property"}}PIXI.scaleModes{{/crossLink}} for possible values
  * @param resolution {Number} The resolution of the texture being generated
  */
 PIXI.RenderTexture = function(width, height, renderer, scaleMode, resolution)
@@ -93,7 +93,7 @@ PIXI.RenderTexture = function(width, height, renderer, scaleMode, resolution)
 
     PIXI.Texture.call(this,
         this.baseTexture,
-        new PIXI.Rectangle(0, 0, this.width, this.height)
+        new PIXI.Rectangle(0, 0, this.width * this.resolution, this.height * this.resolution)
     );
 
     /**
@@ -104,21 +104,21 @@ PIXI.RenderTexture = function(width, height, renderer, scaleMode, resolution)
      */
     this.renderer = renderer || PIXI.defaultRenderer;
 
-    if(this.renderer.type === PIXI.WEBGL_RENDERER)
+    if (this.renderer.type === PIXI.WEBGL_RENDERER)
     {
         var gl = this.renderer.gl;
         this.baseTexture._dirty[gl.id] = false;
 
-        this.textureBuffer = new PIXI.FilterTexture(gl, this.width * this.resolution, this.height * this.resolution, this.baseTexture.scaleMode);
+        this.textureBuffer = new PIXI.FilterTexture(gl, this.width, this.height, this.baseTexture.scaleMode);
         this.baseTexture._glTextures[gl.id] =  this.textureBuffer.texture;
 
         this.render = this.renderWebGL;
-        this.projection = new PIXI.Point(this.width*0.5, -this.height*0.5);
+        this.projection = new PIXI.Point(this.width * 0.5, -this.height * 0.5);
     }
     else
     {
         this.render = this.renderCanvas;
-        this.textureBuffer = new PIXI.CanvasBuffer(this.width* this.resolution, this.height* this.resolution);
+        this.textureBuffer = new PIXI.CanvasBuffer(this.width * this.resolution, this.height * this.resolution);
         this.baseTexture.source = this.textureBuffer.canvas;
     }
 
@@ -127,6 +127,8 @@ PIXI.RenderTexture = function(width, height, renderer, scaleMode, resolution)
      * @type Boolean
      */
     this.valid = true;
+
+    this.tempMatrix = new Phaser.Matrix();
 
     this._updateUvs();
 };
@@ -148,13 +150,15 @@ PIXI.RenderTexture.prototype.resize = function(width, height, updateBase)
 
     this.valid = (width > 0 && height > 0);
 
-    this.width = this.frame.width = this.crop.width = width;
-    this.height =  this.frame.height = this.crop.height = height;
+    this.width = width;
+    this.height = height;
+    this.frame.width = this.crop.width = width * this.resolution;
+    this.frame.height = this.crop.height = height * this.resolution;
 
     if (updateBase)
     {
-        this.baseTexture.width = this.width;
-        this.baseTexture.height = this.height;
+        this.baseTexture.width = this.width * this.resolution;
+        this.baseTexture.height = this.height * this.resolution;
     }
 
     if (this.renderer.type === PIXI.WEBGL_RENDERER)
@@ -165,7 +169,7 @@ PIXI.RenderTexture.prototype.resize = function(width, height, updateBase)
 
     if(!this.valid)return;
 
-    this.textureBuffer.resize(this.width * this.resolution, this.height * this.resolution);
+    this.textureBuffer.resize(this.width, this.height);
 };
 
 /**
@@ -175,7 +179,10 @@ PIXI.RenderTexture.prototype.resize = function(width, height, updateBase)
  */
 PIXI.RenderTexture.prototype.clear = function()
 {
-    if(!this.valid)return;
+    if (!this.valid)
+    {
+        return;
+    }
 
     if (this.renderer.type === PIXI.WEBGL_RENDERER)
     {
@@ -196,43 +203,49 @@ PIXI.RenderTexture.prototype.clear = function()
  */
 PIXI.RenderTexture.prototype.renderWebGL = function(displayObject, matrix, clear)
 {
-    if(!this.valid)return;
-    //TOOD replace position with matrix..
+    if (!this.valid || displayObject.alpha === 0)
+    {
+        return;
+    }
    
-    //Lets create a nice matrix to apply to our display object. Frame buffers come in upside down so we need to flip the matrix 
+    //  Let's create a nice matrix to apply to our display object.
+    //  Frame buffers come in upside down so we need to flip the matrix.
     var wt = displayObject.worldTransform;
     wt.identity();
     wt.translate(0, this.projection.y * 2);
-    if(matrix)wt.append(matrix);
-    wt.scale(1,-1);
 
-    // setWorld Alpha to ensure that the object is renderer at full opacity
-    displayObject.worldAlpha = 1;
-
-    // Time to update all the children of the displayObject with the new matrix..    
-    var children = displayObject.children;
-
-    for(var i=0,j=children.length; i<j; i++)
+    if (matrix)
     {
-        children[i].updateTransform();
+        wt.append(matrix);
+    }
+
+    wt.scale(1, -1);
+
+    //  Time to update all the children of the displayObject with the new matrix.
+    for (var i = 0; i < displayObject.children.length; i++)
+    {
+        displayObject.children[i].updateTransform();
     }
     
-    // time for the webGL fun stuff!
+    //  Time for the webGL fun stuff!
     var gl = this.renderer.gl;
 
     gl.viewport(0, 0, this.width * this.resolution, this.height * this.resolution);
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.textureBuffer.frameBuffer );
 
-    if(clear)this.textureBuffer.clear();
+    if (clear)
+    {
+        this.textureBuffer.clear();
+    }
 
     this.renderer.spriteBatch.dirty = true;
 
-    this.renderer.renderDisplayObject(displayObject, this.projection, this.textureBuffer.frameBuffer);
+    this.renderer.renderDisplayObject(displayObject, this.projection, this.textureBuffer.frameBuffer, matrix);
 
     this.renderer.spriteBatch.dirty = true;
+
 };
-
 
 /**
  * This function will draw the display object to the texture.
@@ -245,29 +258,37 @@ PIXI.RenderTexture.prototype.renderWebGL = function(displayObject, matrix, clear
  */
 PIXI.RenderTexture.prototype.renderCanvas = function(displayObject, matrix, clear)
 {
-    if(!this.valid)return;
-
-    var wt = displayObject.worldTransform;
-    wt.identity();
-    if(matrix)wt.append(matrix);
-
-    // Time to update all the children of the displayObject with the new matrix..    
-    var children = displayObject.children;
-
-    for(var i = 0, j = children.length; i < j; i++)
+    if (!this.valid || displayObject.alpha === 0)
     {
-        children[i].updateTransform();
+        return;
     }
 
-    if(clear)this.textureBuffer.clear();
+    //  Let's create a nice matrix to apply to our display object.
+    //  Frame buffers come in upside down so we need to flip the matrix.
+    var wt = displayObject.worldTransform;
+    wt.identity();
 
-    var context = this.textureBuffer.context;
+    if (matrix)
+    {
+        wt.append(matrix);
+    }
+
+    // Time to update all the children of the displayObject with the new matrix (what new matrix? there isn't one!)
+    for (var i = 0; i < displayObject.children.length; i++)
+    {
+        displayObject.children[i].updateTransform();
+    }
+
+    if (clear)
+    {
+        this.textureBuffer.clear();
+    }
 
     var realResolution = this.renderer.resolution;
 
     this.renderer.resolution = this.resolution;
 
-    this.renderer.renderDisplayObject(displayObject, context);
+    this.renderer.renderDisplayObject(displayObject, this.textureBuffer.context, matrix);
 
     this.renderer.resolution = realResolution;
 };
@@ -286,7 +307,7 @@ PIXI.RenderTexture.prototype.getImage = function()
 };
 
 /**
- * Will return a a base64 encoded string of this texture. It works by calling RenderTexture.getCanvas and then running toDataURL on that.
+ * Will return a base64 encoded string of this texture. It works by calling RenderTexture.getCanvas and then running toDataURL on that.
  *
  * @method getBase64
  * @return {String} A base64 encoded string of the texture.
@@ -318,16 +339,7 @@ PIXI.RenderTexture.prototype.getCanvas = function()
 
         var tempCanvas = new PIXI.CanvasBuffer(width, height);
         var canvasData = tempCanvas.context.getImageData(0, 0, width, height);
-        var canvasPixels = canvasData.data;
-
-        for (var i = 0; i < webGLPixels.length; i+=4)
-        {
-            var alpha = webGLPixels[i+3];
-            canvasPixels[i] = webGLPixels[i] * alpha;
-            canvasPixels[i+1] = webGLPixels[i+1] * alpha;
-            canvasPixels[i+2] = webGLPixels[i+2] * alpha;
-            canvasPixels[i+3] = alpha;
-        }
+        canvasData.data.set(webGLPixels);
 
         tempCanvas.context.putImageData(canvasData, 0, 0);
 
@@ -338,5 +350,3 @@ PIXI.RenderTexture.prototype.getCanvas = function()
         return this.textureBuffer.canvas;
     }
 };
-
-PIXI.RenderTexture.tempMatrix = new PIXI.Matrix();

@@ -2,22 +2,27 @@
 
 /**
 * @author       Richard Davey <rich@photonstorm.com>
-* @copyright    2014 Photon Storm Ltd.
+* @copyright    2015 Photon Storm Ltd.
 * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
 */
 
 /**
 * An extremely useful repeatable random data generator.
+*
 * Based on Nonsense by Josh Faul https://github.com/jocafa/Nonsense.
-* Random number generator from http://baagoe.org/en/wiki/Better_random_numbers_for_javascript
+*
+* The random number genererator is based on the Alea PRNG, but is modified.
+*  - https://github.com/coverslide/node-alea
+*  - https://github.com/nquinlan/better-random-numbers-for-javascript-mirror
+*  - http://baagoe.org/en/wiki/Better_random_numbers_for_javascript (original, perm. 404)
 *
 * @class Phaser.RandomDataGenerator
 * @constructor
-* @param {array} [seeds] - An array of values to use as the seed.
+* @param {any[]} [seeds] - An array of values to use as the seed.
 */
 Phaser.RandomDataGenerator = function (seeds) {
 
-    if (typeof seeds === "undefined") { seeds = []; }
+    if (seeds === undefined) { seeds = []; }
 
     /**
     * @property {number} c - Internal var.
@@ -71,22 +76,29 @@ Phaser.RandomDataGenerator.prototype = {
     /**
     * Reset the seed of the random data generator.
     *
+    * _Note_: the seed array is only processed up to the first `undefined` (or `null`) value, should such be present.
+    *
     * @method Phaser.RandomDataGenerator#sow
-    * @param {array} seeds
+    * @param {any[]} seeds - The array of seeds: the `toString()` of each value is used.
     */
     sow: function (seeds) {
 
-        if (typeof seeds === "undefined") { seeds = []; }
-
+        // Always reset to default seed
         this.s0 = this.hash(' ');
         this.s1 = this.hash(this.s0);
         this.s2 = this.hash(this.s1);
         this.c = 1;
 
-        var seed;
-
-        for (var i = 0; seed = seeds[i++]; )
+        if (!seeds)
         {
+            return;
+        }
+
+        // Apply any seeds
+        for (var i = 0; i < seeds.length && (seeds[i] != null); i++)
+        {
+            var seed = seeds[i];
+
             this.s0 -= this.hash(seed);
             this.s0 += ~~(this.s0 < 0);
             this.s1 -= this.hash(seed);
@@ -102,7 +114,7 @@ Phaser.RandomDataGenerator.prototype = {
     *
     * @method Phaser.RandomDataGenerator#hash
     * @private
-    * @param {Any} data
+    * @param {any} data
     * @return {number} hashed value.
     */
     hash: function (data) {
@@ -258,7 +270,7 @@ Phaser.RandomDataGenerator.prototype = {
     */
     weightedPick: function (ary) {
 
-        return ary[~~(Math.pow(this.frac(), 2) * (ary.length - 1))];
+        return ary[~~(Math.pow(this.frac(), 2) * (ary.length - 1) + 0.5)];
 
     },
 

@@ -34,7 +34,7 @@ PIXI.CanvasBuffer = function(width, height)
      * @property canvas
      * @type HTMLCanvasElement
      */
-    this.canvas = document.createElement("canvas");
+    this.canvas = PIXI.CanvasPool.create(this, this.width, this.height);
 
     /**
      * A CanvasRenderingContext2D object representing a two-dimensional rendering context.
@@ -58,6 +58,7 @@ PIXI.CanvasBuffer.prototype.constructor = PIXI.CanvasBuffer;
  */
 PIXI.CanvasBuffer.prototype.clear = function()
 {
+    this.context.setTransform(1, 0, 0, 1, 0, 0);
     this.context.clearRect(0,0, this.width, this.height);
 };
 
@@ -72,4 +73,14 @@ PIXI.CanvasBuffer.prototype.resize = function(width, height)
 {
     this.width = this.canvas.width = width;
     this.height = this.canvas.height = height;
+};
+
+/**
+ * Frees the canvas up for use again.
+ *
+ * @method destroy
+ */
+PIXI.CanvasBuffer.prototype.destroy = function()
+{
+    PIXI.CanvasPool.remove(this);
 };

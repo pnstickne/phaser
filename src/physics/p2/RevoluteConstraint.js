@@ -1,6 +1,6 @@
 /**
 * @author       Richard Davey <rich@photonstorm.com>
-* @copyright    2014 Photon Storm Ltd.
+* @copyright    2015 Photon Storm Ltd.
 * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
 */
 
@@ -20,8 +20,8 @@
 */
 Phaser.Physics.P2.RevoluteConstraint = function (world, bodyA, pivotA, bodyB, pivotB, maxForce, worldPivot) {
 
-    if (typeof maxForce === 'undefined') { maxForce = Number.MAX_VALUE; }
-    if (typeof worldPivot === 'undefined') { worldPivot = null; }
+    if (maxForce === undefined) { maxForce = Number.MAX_VALUE; }
+    if (worldPivot === undefined) { worldPivot = null; }
 
     /**
     * @property {Phaser.Game} game - Local reference to game.

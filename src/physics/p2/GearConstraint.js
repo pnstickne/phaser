@@ -1,6 +1,6 @@
 /**
 * @author       Richard Davey <rich@photonstorm.com>
-* @copyright    2014 Photon Storm Ltd.
+* @copyright    2015 Photon Storm Ltd.
 * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
 */
 
@@ -17,8 +17,8 @@
 */
 Phaser.Physics.P2.GearConstraint = function (world, bodyA, bodyB, angle, ratio) {
 
-    if (typeof angle === 'undefined') { angle = 0; }
-    if (typeof ratio === 'undefined') { ratio = 1; }
+    if (angle === undefined) { angle = 0; }
+    if (ratio === undefined) { ratio = 1; }
 
     /**
     * @property {Phaser.Game} game - Local reference to game.

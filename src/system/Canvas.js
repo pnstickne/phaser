@@ -1,11 +1,12 @@
 /**
 * @author       Richard Davey <rich@photonstorm.com>
-* @copyright    2014 Photon Storm Ltd.
+* @copyright    2015 Photon Storm Ltd.
 * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
 */
 
 /**
-* The Canvas class handles everything related to creating the `canvas` DOM tag that Phaser will use, including styles, offset and aspect ratio.
+* The Canvas class handles everything related to creating the `canvas` DOM tag that Phaser will use, 
+* including styles, offset and aspect ratio.
 *
 * @class Phaser.Canvas
 * @static
@@ -16,17 +17,26 @@ Phaser.Canvas = {
     * Creates a `canvas` DOM element. The element is not automatically added to the document.
     *
     * @method Phaser.Canvas.create
+    * @param {object} parent - The object that will own the canvas that is created.
     * @param {number} [width=256] - The width of the canvas element.
     * @param {number} [height=256] - The height of the canvas element..
-    * @param {string} [id=''] - If given this will be set as the ID of the canvas element, otherwise no ID will be set.
+    * @param {string} [id=(none)] - If specified, and not the empty string, this will be set as the ID of the canvas element. Otherwise no ID will be set.
+    * @param {boolean} [skipPool=false] - If `true` the canvas will not be placed in the CanvasPool global.
     * @return {HTMLCanvasElement} The newly created canvas element.
     */
-    create: function (width, height, id) {
+    create: function (parent, width, height, id, skipPool) {
 
         width = width || 256;
         height = height || 256;
 
-        var canvas = document.createElement('canvas');
+        if (skipPool === undefined)
+        {
+            var canvas = PIXI.CanvasPool.create(parent, width, height);
+        }
+        else
+        {
+            var canvas = document.createElement('canvas');
+        }
 
         if (typeof id === 'string' && id !== '')
         {
@@ -35,60 +45,10 @@ Phaser.Canvas = {
 
         canvas.width = width;
         canvas.height = height;
-
         canvas.style.display = 'block';
 
         return canvas;
 
-    },
-
-    /**
-    * Get the DOM offset values of any given element
-    * @method Phaser.Canvas.getOffset
-    * @param {HTMLElement} element - The targeted element that we want to retrieve the offset.
-    * @param {Phaser.Point} [point] - The point we want to take the x/y values of the offset.
-    * @return {Phaser.Point} - A point objet with the offsetX and Y as its properties.
-    */
-    getOffset: function (element, point) {
-
-        point = point || new Phaser.Point();
-
-        var box = element.getBoundingClientRect();
-        var clientTop = element.clientTop || document.body.clientTop || 0;
-        var clientLeft = element.clientLeft || document.body.clientLeft || 0;
-
-        //  Without this check Chrome is now throwing console warnings about strict vs. quirks :(
-
-        var scrollTop = 0;
-        var scrollLeft = 0;
-
-        if (document.compatMode === 'CSS1Compat')
-        {
-            scrollTop = window.pageYOffset || document.documentElement.scrollTop || element.scrollTop || 0;
-            scrollLeft = window.pageXOffset || document.documentElement.scrollLeft || element.scrollLeft || 0;
-        }
-        else
-        {
-            scrollTop = window.pageYOffset || document.body.scrollTop || element.scrollTop || 0;
-            scrollLeft = window.pageXOffset || document.body.scrollLeft || element.scrollLeft || 0;
-        }
-
-        point.x = box.left + scrollLeft - clientLeft;
-        point.y = box.top + scrollTop - clientTop;
-
-        return point;
-
-    },
-
-    /**
-    * Returns the aspect ratio of the given canvas.
-    *
-    * @method Phaser.Canvas.getAspectRatio
-    * @param {HTMLCanvasElement} canvas - The canvas to get the aspect ratio from.
-    * @return {number} The ratio between canvas' width and height.
-    */
-    getAspectRatio: function (canvas) {
-        return canvas.width / canvas.height;
     },
 
     /**
@@ -114,7 +74,7 @@ Phaser.Canvas = {
     *
     * @method Phaser.Canvas.setTouchAction
     * @param {HTMLCanvasElement} canvas - The canvas to set the touch action on.
-    * @param {String} [value] - The touch action to set. Defaults to 'none'.
+    * @param {string} [value] - The touch action to set. Defaults to 'none'.
     * @return {HTMLCanvasElement} The source canvas.
     */
     setTouchAction: function (canvas, value) {
@@ -134,7 +94,7 @@ Phaser.Canvas = {
     *
     * @method Phaser.Canvas.setUserSelect
     * @param {HTMLCanvasElement} canvas - The canvas to set the touch action on.
-    * @param {String} [value] - The touch action to set. Defaults to 'none'.
+    * @param {string} [value] - The touch action to set. Defaults to 'none'.
     * @return {HTMLCanvasElement} The source canvas.
     */
     setUserSelect: function (canvas, value) {
@@ -167,7 +127,7 @@ Phaser.Canvas = {
 
         var target;
 
-        if (typeof overflowHidden === 'undefined') { overflowHidden = true; }
+        if (overflowHidden === undefined) { overflowHidden = true; }
 
         if (parent)
         {
@@ -250,11 +210,18 @@ Phaser.Canvas = {
     */
     setSmoothingEnabled: function (context, value) {
 
-        context['imageSmoothingEnabled'] = value;
-        context['mozImageSmoothingEnabled'] = value;
-        context['oImageSmoothingEnabled'] = value;
-        context['webkitImageSmoothingEnabled'] = value;
-        context['msImageSmoothingEnabled'] = value;
+        var vendor = [ 'i', 'mozI', 'oI', 'webkitI', 'msI' ];
+
+        for (var prefix in vendor)
+        {
+            var s = vendor[prefix] + 'mageSmoothingEnabled';
+
+            if (s in context)
+            {
+                context[s] = value;
+                return context;
+            }
+        }
 
         return context;
 

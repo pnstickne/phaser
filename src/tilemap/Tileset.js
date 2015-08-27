@@ -1,6 +1,6 @@
 /**
 * @author       Richard Davey <rich@photonstorm.com>
-* @copyright    2014 Photon Storm Ltd.
+* @copyright    2015 Photon Storm Ltd.
 * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
 */
 
@@ -21,80 +21,88 @@
 */
 Phaser.Tileset = function (name, firstgid, width, height, margin, spacing, properties) {
 
-    if (typeof width === 'undefined' || width <= 0) { width = 32; }
-    if (typeof height === 'undefined' || height <= 0) { height = 32; }
-    if (typeof margin === 'undefined') { margin = 0; }
-    if (typeof spacing === 'undefined') { spacing = 0; }
+    if (width === undefined || width <= 0) { width = 32; }
+    if (height === undefined || height <= 0) { height = 32; }
+    if (margin === undefined) { margin = 0; }
+    if (spacing === undefined) { spacing = 0; }
 
     /**
     * The name of the Tileset.
-    * @member {string}
+    * @property {string} name
     */
     this.name = name;
 
     /**
     * The Tiled firstgid value.
     * This is the starting index of the first tile index this Tileset contains.
-    * @member {integer}
+    * @property {integer} firstgid
     */
     this.firstgid = firstgid | 0;
 
     /**
     * The width of each tile (in pixels).
-    * @member {integer}
+    * @property {integer} tileWidth
+    * @readonly
     */
     this.tileWidth = width | 0;
 
     /**
     * The height of each tile (in pixels).
-    * @member {integer}
+    * @property {integer} tileHeight
+    * @readonly
     */
     this.tileHeight = height | 0;
 
     /**
     * The margin around the tiles in the sheet (in pixels).
-    * @member {integer}
+    * Use `setSpacing` to change.
+    * @property {integer} tileMarge
+    * @readonly
     */
+    // Modified internally
     this.tileMargin = margin | 0;
 
     /**
     * The spacing between each tile in the sheet (in pixels).
-    * @member {integer}
+    * Use `setSpacing` to change.
+    * @property {integer} tileSpacing
+    * @readonly
     */
     this.tileSpacing = spacing | 0;
 
     /**
     * Tileset-specific properties that are typically defined in the Tiled editor.
-    * @member {object}
+    * @property {object} properties
     */
     this.properties = properties || {};
 
     /**
-    * The cached image that contains the individual tiles. Use `setImage` to set.
-    * @member {?object}
+    * The cached image that contains the individual tiles. Use {@link Phaser.Tileset.setImage setImage} to set.
+    * @property {?object} image
+    * @readonly
     */
     // Modified internally
     this.image = null;
 
     /**
-    * The number of rows in the tile sheet.
-    * @member {integer}
+    * The number of tile rows in the the tileset.
+    * @property {integer}
     * @readonly
     */
     // Modified internally
     this.rows = 0;
 
     /**
-    * The number of columns in the sheet.
-    * @member {integer}
+    * The number of tile columns in the tileset.
+    * @property {integer} columns
     * @readonly
     */
     // Modified internally
     this.columns = 0;
 
     /**
-    * The total number of tiles in the sheet.
-    * @member {integer}
+    * The total number of tiles in the tileset.
+    * @property {integer} total
     * @readonly
     */
     // Modified internally
@@ -103,24 +111,10 @@ Phaser.Tileset = function (name, firstgid, width, height, margin, spacing, prope
     /**
     * The look-up table to specific tile image offsets.
     * The coordinates are interlaced such that it is [x0, y0, x1, y1 .. xN, yN] and the tile with the index of firstgid is found at indices 0/1.
-    * @member {integer[]}
+    * @property {integer[]} drawCoords
     * @private
     */
     this.drawCoords = [];
-
-    /**
-    * The texture look-up.
-    * @member {PIXI.Texture[]}
-    * @private
-    */
-    this.textures = [];
-
-    /**
-    * Base texture. Created on-demand by a texture lookup.
-    * @member {?PIXI.BaseTexture}
-    * @private
-    */
-    this.baseTexture = null;
 
 };
 
@@ -130,6 +124,7 @@ Phaser.Tileset.prototype = {
     * Draws a tile from this Tileset at the given coordinates on the context.
     *
     * @method Phaser.Tileset#draw
+    * @public
     * @param {CanvasRenderingContext2D} context - The context to draw the tile onto.
     * @param {number} x - The x coordinate to draw to.
     * @param {number} y - The y coordinate to draw to.
@@ -158,31 +153,13 @@ Phaser.Tileset.prototype = {
     },
 
     /**
-    * Obtains a PIXI.Texture into the Image. The texture is cached.
-    * @protected
-    * @param {integer} tileId
-    * @returns {PIXI.Texture}
-    */
-    getTileTexture: function (tileId) {
-
-        if (!this.baseTexture && this.image) {
-            this.baseTexture = new PIXI.BaseTexture(this.image);
-            this.updateTileData();
-        }
-
-        var textureIndex = tileId - this.firstgid;
-        return this.textures[textureIndex] || null;
-
-    },
-
-    /**
     * Returns true if and only if this tileset contains the given tile index.
     *
+    * @method Phaser.Tileset#containsTileIndex
     * @public
     * @return {boolean} True if this tileset contains the given index.
     */
-    containsTileIndex: function (tileIndex)
-    {
+    containsTileIndex: function (tileIndex) {
 
         return (
             tileIndex >= this.firstgid &&
@@ -194,55 +171,71 @@ Phaser.Tileset.prototype = {
     /**
     * Set the image associated with this Tileset and update the tile data.
     *
+    * @method Phaser.Tileset#setImage
     * @public
     * @param {Image} image - The image that contains the tiles.
     */
     setImage: function (image) {
 
         this.image = image;
-        if (this.baseTexture) {
-            this.baseTexture = new PIXI.BaseTexture(this.image);
-        }
-
-        this.updateTileData();
+        this.updateTileData(image.width, image.height);
        
     },
 
     /**
     * Sets tile spacing and margins.
     *
+    * @method Phaser.Tileset#setSpacing
     * @public
-    * @param {integer} tileMargin - The margin around the tiles in the sheet (in pixels).
-    * @param {integer} tileSpacing - The spacing between the tiles in the sheet (in pixels).
+    * @param {integer} [margin=0] - The margin around the tiles in the sheet (in pixels).
+    * @param {integer} [spacing=0] - The spacing between the tiles in the sheet (in pixels).
     */
     setSpacing: function (margin, spacing) {
 
         this.tileMargin = margin | 0;
         this.tileSpacing = spacing | 0;
 
-        this.updateTileData();
+        if (this.image)
+        {
+            this.updateTileData(this.image.width, this.image.height);
+        }
 
     },
 
     /**
     * Updates tile coordinates and tileset data.
-    *    
-    * @protected
+    *
+    * @method Phaser.Tileset#updateTileData
+    * @private
+    * @param {integer} imageWidth - The (expected) width of the image to slice.
+    * @param {integer} imageHeight - The (expected) height of the image to slice.
     */
-    updateTileData: function () {
+    updateTileData: function (imageWidth, imageHeight) {
 
-        var image = this.image;
-        this.rows = Math.round((image.height - this.tileMargin) / (this.tileHeight + this.tileSpacing));
-        this.columns = Math.round((image.width - this.tileMargin) / (this.tileWidth + this.tileSpacing));
-        this.total = this.rows * this.columns;
+        // May be fractional values
+        var rowCount = (imageHeight - this.tileMargin * 2 + this.tileSpacing) / (this.tileHeight + this.tileSpacing);
+        var colCount = (imageWidth - this.tileMargin * 2 + this.tileSpacing) / (this.tileWidth + this.tileSpacing);
 
-        var updateTextures = !!this.baseTexture;
+        if (rowCount % 1 !== 0 || colCount % 1 !== 0)
+        {
+            console.warn("Phaser.Tileset - image tile area is not an even multiple of tile size");
+        }
+
+        // In Tiled a tileset image that is not an even multiple of the tile dimensions
+        // is truncated - hence the floor when calculating the rows/columns.
+        rowCount = Math.floor(rowCount);
+        colCount = Math.floor(colCount);
+
+        if ((this.rows && this.rows !== rowCount) || (this.columns && this.columns !== colCount))
+        {
+            console.warn("Phaser.Tileset - actual and expected number of tile rows and columns differ");
+        }
+
+        this.rows = rowCount;
+        this.columns = colCount;
+        this.total = rowCount * colCount;
 
         this.drawCoords.length = 0;
-        if (updateTextures)
-        {
-            this.textures.length = 0;
-        }
 
         var tx = this.tileMargin;
         var ty = this.tileMargin;
@@ -253,14 +246,6 @@ Phaser.Tileset.prototype = {
             {
                 this.drawCoords.push(tx);
                 this.drawCoords.push(ty);
-
-                if (updateTextures)
-                {
-                    var texture = new PIXI.Texture(this.baseTexture,
-                        new Phaser.Rectangle(tx, ty, this.tileWidth, this.tileHeight));
-                    this.textures.push(texture);
-                }
-
                 tx += this.tileWidth + this.tileSpacing;
             }
 

@@ -13,16 +13,17 @@
  * @param [options] {Object} The optional renderer parameters
  * @param [options.view] {HTMLCanvasElement} the canvas to use as a view, optional
  * @param [options.transparent=false] {Boolean} If the render view is transparent, default false
+ * @param [options.autoResize=false] {Boolean} If the render view is automatically resized, default false
  * @param [options.resolution=1] {Number} the resolution of the renderer retina would be 2
  * @param [options.clearBeforeRender=true] {Boolean} This sets if the CanvasRenderer will clear the canvas or not before the new render pass.
  */
 PIXI.CanvasRenderer = function(width, height, options)
 {
-    if(options)
+    if (options)
     {
         for (var i in PIXI.defaultRenderOptions)
         {
-            if (typeof options[i] === "undefined") options[i] = PIXI.defaultRenderOptions[i];
+            if (options[i] === undefined) options[i] = PIXI.defaultRenderOptions[i];
         }
     }
     else
@@ -30,9 +31,8 @@ PIXI.CanvasRenderer = function(width, height, options)
         options = PIXI.defaultRenderOptions;
     }
 
-    if(!PIXI.defaultRenderer)
+    if (!PIXI.defaultRenderer)
     {
-        PIXI.sayHello("Canvas");
         PIXI.defaultRenderer = this;
     }
 
@@ -71,7 +71,15 @@ PIXI.CanvasRenderer = function(width, height, options)
      * @type Boolean
      */
     this.transparent = options.transparent;
-    
+
+    /**
+     * Whether the render view should be resized automatically
+     *
+     * @property autoResize
+     * @type Boolean
+     */
+    this.autoResize = options.autoResize || false;
+
     /**
      * The width of the canvas view
      *
@@ -99,14 +107,14 @@ PIXI.CanvasRenderer = function(width, height, options)
      * @property view
      * @type HTMLCanvasElement
      */
-    this.view = options.view || document.createElement( "canvas" );
+    this.view = options.view || PIXI.CanvasPool.create(this, this.width, this.height);
 
     /**
      * The canvas 2d context that everything is drawn with
      * @property context
      * @type CanvasRenderingContext2D
      */
-    this.context = this.view.getContext( "2d", { alpha: this.transparent } );
+    this.context = this.view.getContext("2d", { alpha: this.transparent } );
 
     /**
      * Boolean flag controlling canvas refresh.
@@ -147,7 +155,6 @@ PIXI.CanvasRenderer = function(width, height, options)
         /**
          * If true Pixi will Math.floor() x/y values when rendering, stopping pixel interpolation.
          * Handy for crisp pixel art and speed on legacy devices.
-         *
          */
         roundPixels: false
     };
@@ -188,7 +195,8 @@ PIXI.CanvasRenderer.prototype.render = function(stage)
     this.renderSession.currentBlendMode = PIXI.blendModes.NORMAL;
     this.context.globalCompositeOperation = PIXI.blendModesCanvas[PIXI.blendModes.NORMAL];
 
-    if (navigator.isCocoonJS && this.view.screencanvas) {
+    if (navigator.isCocoonJS && this.view.screencanvas)
+    {
         this.context.fillStyle = "black";
         this.context.clear();
     }
@@ -208,16 +216,6 @@ PIXI.CanvasRenderer.prototype.render = function(stage)
     
     this.renderDisplayObject(stage);
 
-    // run interaction!
-    if(stage.interactive)
-    {
-        //need to add some events!
-        if(!stage._interactiveEventsAdded)
-        {
-            stage._interactiveEventsAdded = true;
-            stage.interactionManager.setTarget(this);
-        }
-    }
 };
 
 /**
@@ -228,7 +226,7 @@ PIXI.CanvasRenderer.prototype.render = function(stage)
  */
 PIXI.CanvasRenderer.prototype.destroy = function(removeView)
 {
-    if (typeof removeView === "undefined") { removeView = true; }
+    if (removeView === undefined) { removeView = true; }
 
     if (removeView && this.view.parent)
     {
@@ -257,8 +255,10 @@ PIXI.CanvasRenderer.prototype.resize = function(width, height)
     this.view.width = this.width;
     this.view.height = this.height;
 
-    this.view.style.width = this.width / this.resolution + "px";
-    this.view.style.height = this.height / this.resolution + "px";
+    if (this.autoResize) {
+        this.view.style.width = this.width / this.resolution + "px";
+        this.view.style.height = this.height / this.resolution + "px";
+    }
 };
 
 /**
@@ -267,13 +267,14 @@ PIXI.CanvasRenderer.prototype.resize = function(width, height)
  * @method renderDisplayObject
  * @param displayObject {DisplayObject} The displayObject to render
  * @param context {CanvasRenderingContext2D} the context 2d method of the canvas
+ * @param [matrix] {Matrix} Optional matrix to apply to the display object before rendering.
  * @private
  */
-PIXI.CanvasRenderer.prototype.renderDisplayObject = function(displayObject, context)
+PIXI.CanvasRenderer.prototype.renderDisplayObject = function(displayObject, context, matrix)
 {
     this.renderSession.context = context || this.context;
     this.renderSession.resolution = this.resolution;
-    displayObject._renderCanvas(this.renderSession);
+    displayObject._renderCanvas(this.renderSession, matrix);
 };
 
 /**

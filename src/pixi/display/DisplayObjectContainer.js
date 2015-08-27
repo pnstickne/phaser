@@ -12,16 +12,17 @@
  */
 PIXI.DisplayObjectContainer = function()
 {
-    PIXI.DisplayObject.call( this );
+    PIXI.DisplayObject.call(this);
 
     /**
      * [read-only] The array of children of this container.
      *
      * @property children
-     * @type Array<DisplayObject>
+     * @type Array(DisplayObject)
      * @readOnly
      */
     this.children = [];
+    
 };
 
 // constructor
@@ -35,22 +36,23 @@ PIXI.DisplayObjectContainer.prototype.constructor = PIXI.DisplayObjectContainer;
  * @type Number
  */
 Object.defineProperty(PIXI.DisplayObjectContainer.prototype, 'width', {
+
     get: function() {
         return this.scale.x * this.getLocalBounds().width;
     },
+
     set: function(value) {
         
         var width = this.getLocalBounds().width;
 
-        if(width !== 0)
+        if (width !== 0)
         {
-            this.scale.x = value / ( width/this.scale.x );
+            this.scale.x = value / width;
         }
         else
         {
             this.scale.x = 1;
         }
-
         
         this._width = value;
     }
@@ -63,16 +65,18 @@ Object.defineProperty(PIXI.DisplayObjectContainer.prototype, 'width', {
  * @type Number
  */
 Object.defineProperty(PIXI.DisplayObjectContainer.prototype, 'height', {
+
     get: function() {
         return  this.scale.y * this.getLocalBounds().height;
     },
+
     set: function(value) {
 
         var height = this.getLocalBounds().height;
 
-        if(height !== 0)
+        if (height !== 0)
         {
-            this.scale.y = value / ( height/this.scale.y );
+            this.scale.y = value / height;
         }
         else
         {
@@ -81,6 +85,7 @@ Object.defineProperty(PIXI.DisplayObjectContainer.prototype, 'height', {
 
         this._height = value;
     }
+
 });
 
 /**
@@ -278,17 +283,26 @@ PIXI.DisplayObjectContainer.prototype.removeChildren = function(beginIndex, endI
  */
 PIXI.DisplayObjectContainer.prototype.updateTransform = function()
 {
-    if(!this.visible)return;
+    if (!this.visible)
+    {
+        return;
+    }
 
-    PIXI.DisplayObject.prototype.updateTransform.call( this );
+    this.displayObjectUpdateTransform();
 
-    if(this._cacheAsBitmap)return;
+    if (this._cacheAsBitmap)
+    {
+        return;
+    }
 
-    for(var i=0,j=this.children.length; i<j; i++)
+    for (var i = 0; i < this.children.length; i++)
     {
         this.children[i].updateTransform();
     }
 };
+
+// performance increase to avoid using call.. (10x faster)
+PIXI.DisplayObjectContainer.prototype.displayObjectContainerUpdateTransform = PIXI.DisplayObjectContainer.prototype.updateTransform;
 
 /**
  * Retrieves the bounds of the displayObjectContainer as a rectangle. The bounds calculation takes all visible children into consideration.
@@ -383,12 +397,10 @@ PIXI.DisplayObjectContainer.prototype.getLocalBounds = function()
 PIXI.DisplayObjectContainer.prototype.setStageReference = function(stage)
 {
     this.stage = stage;
-    if(this._interactive)this.stage.dirty = true;
-
-    for(var i=0,j=this.children.length; i<j; i++)
+    
+    for (var i=0; i < this.children.length; i++)
     {
-        var child = this.children[i];
-        child.setStageReference(stage);
+        this.children[i].setStageReference(stage)
     }
 };
 
@@ -399,15 +411,11 @@ PIXI.DisplayObjectContainer.prototype.setStageReference = function(stage)
  */
 PIXI.DisplayObjectContainer.prototype.removeStageReference = function()
 {
-
-    for(var i=0,j=this.children.length; i<j; i++)
+    for (var i = 0; i < this.children.length; i++)
     {
-        var child = this.children[i];
-        child.removeStageReference();
+        this.children[i].removeStageReference();
     }
 
-    if(this._interactive)this.stage.dirty = true;
-    
     this.stage = null;
 };
 
@@ -420,27 +428,26 @@ PIXI.DisplayObjectContainer.prototype.removeStageReference = function()
 */
 PIXI.DisplayObjectContainer.prototype._renderWebGL = function(renderSession)
 {
-    if(!this.visible || this.alpha <= 0)return;
+    if (!this.visible || this.alpha <= 0) return;
     
-    if(this._cacheAsBitmap)
+    if (this._cacheAsBitmap)
     {
         this._renderCachedSprite(renderSession);
         return;
     }
     
-    var i,j;
+    var i;
 
-    if(this._mask || this._filters)
+    if (this._mask || this._filters)
     {
-        
         // push filter first as we need to ensure the stencil buffer is correct for any masking
-        if(this._filters)
+        if (this._filters)
         {
             renderSession.spriteBatch.flush();
             renderSession.filterManager.pushFilter(this._filterBlock);
         }
 
-        if(this._mask)
+        if (this._mask)
         {
             renderSession.spriteBatch.stop();
             renderSession.maskManager.pushMask(this.mask, renderSession);
@@ -448,22 +455,22 @@ PIXI.DisplayObjectContainer.prototype._renderWebGL = function(renderSession)
         }
 
         // simple render children!
-        for(i=0,j=this.children.length; i<j; i++)
+        for (i = 0; i < this.children.length; i++)
         {
             this.children[i]._renderWebGL(renderSession);
         }
 
         renderSession.spriteBatch.stop();
 
-        if(this._mask)renderSession.maskManager.popMask(this._mask, renderSession);
-        if(this._filters)renderSession.filterManager.popFilter();
+        if (this._mask) renderSession.maskManager.popMask(this._mask, renderSession);
+        if (this._filters) renderSession.filterManager.popFilter();
         
         renderSession.spriteBatch.start();
     }
     else
     {
         // simple render children!
-        for(i=0,j=this.children.length; i<j; i++)
+        for (i = 0; i < this.children.length; i++)
         {
             this.children[i]._renderWebGL(renderSession);
         }
@@ -479,27 +486,25 @@ PIXI.DisplayObjectContainer.prototype._renderWebGL = function(renderSession)
 */
 PIXI.DisplayObjectContainer.prototype._renderCanvas = function(renderSession)
 {
-    if(this.visible === false || this.alpha === 0)return;
+    if (this.visible === false || this.alpha === 0) return;
 
-    if(this._cacheAsBitmap)
+    if (this._cacheAsBitmap)
     {
-
         this._renderCachedSprite(renderSession);
         return;
     }
 
-    if(this._mask)
+    if (this._mask)
     {
         renderSession.maskManager.pushMask(this._mask, renderSession);
     }
 
-    for(var i=0,j=this.children.length; i<j; i++)
+    for (var i = 0; i < this.children.length; i++)
     {
-        var child = this.children[i];
-        child._renderCanvas(renderSession);
+        this.children[i]._renderCanvas(renderSession);
     }
 
-    if(this._mask)
+    if (this._mask)
     {
         renderSession.maskManager.popMask(renderSession);
     }

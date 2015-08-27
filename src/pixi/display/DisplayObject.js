@@ -17,7 +17,7 @@ PIXI.DisplayObject = function()
      * @property position
      * @type Point
      */
-    this.position = new PIXI.Point();
+    this.position = new PIXI.Point(0, 0);
 
     /**
      * The scale factor of the object.
@@ -25,7 +25,26 @@ PIXI.DisplayObject = function()
      * @property scale
      * @type Point
      */
-    this.scale = new PIXI.Point(1,1);//{x:1, y:1};
+    this.scale = new PIXI.Point(1, 1);
+
+    /**
+     * The transform callback is an optional callback that if set will be called at the end of the updateTransform method and sent two parameters:
+     * This Display Objects worldTransform matrix and its parents transform matrix. Both are PIXI.Matrix object types.
+     * The matrix are passed by reference and can be modified directly without needing to return them.
+     * This ability allows you to check any of the matrix values and perform actions such as clamping scale or limiting rotation, regardless of the parent transforms.
+     * 
+     * @property transformCallback
+     * @type Function
+     */
+    this.transformCallback = null;
+
+    /**
+     * The context under which the transformCallback is invoked.
+     * 
+     * @property transformCallbackContext
+     * @type Object
+     */
+    this.transformCallbackContext = null;
 
     /**
      * The pivot point of the displayObject that it rotates around
@@ -33,7 +52,7 @@ PIXI.DisplayObject = function()
      * @property pivot
      * @type Point
      */
-    this.pivot = new PIXI.Point(0,0);
+    this.pivot = new PIXI.Point(0, 0);
 
     /**
      * The rotation of the object in radians.
@@ -67,14 +86,6 @@ PIXI.DisplayObject = function()
      * @type Rectangle|Circle|Ellipse|Polygon
      */
     this.hitArea = null;
-
-    /**
-     * This is used to indicate if the displayObject should display a mouse hand cursor on rollover
-     *
-     * @property buttonMode
-     * @type Boolean
-     */
-    this.buttonMode = false;
 
     /**
      * Can this object be rendered
@@ -112,25 +123,6 @@ PIXI.DisplayObject = function()
     this.worldAlpha = 1;
 
     /**
-     * [read-only] Whether or not the object is interactive, do not toggle directly! use the `interactive` property
-     *
-     * @property _interactive
-     * @type Boolean
-     * @readOnly
-     * @private
-     */
-    this._interactive = false;
-
-    /**
-     * This is the cursor that will be used when the mouse is over this object. To enable this the element must have interaction = true and buttonMode = true
-     *
-     * @property defaultCursor
-     * @type String
-     *
-    */
-    this.defaultCursor = 'pointer';
-
-    /**
      * [read-only] Current transform of the object based on world (parent) factors
      *
      * @property worldTransform
@@ -139,6 +131,36 @@ PIXI.DisplayObject = function()
      * @private
      */
     this.worldTransform = new PIXI.Matrix();
+
+    /**
+     * The position of the Display Object based on the world transform.
+     * This value is updated at the end of updateTransform and takes all parent transforms into account.
+     *
+     * @property worldPosition
+     * @type Point
+     * @readOnly
+     */
+    this.worldPosition = new PIXI.Point(0, 0);
+
+    /**
+     * The scale of the Display Object based on the world transform.
+     * This value is updated at the end of updateTransform and takes all parent transforms into account.
+     *
+     * @property worldScale
+     * @type Point
+     * @readOnly
+     */
+    this.worldScale = new PIXI.Point(1, 1);
+
+    /**
+     * The rotation of the Display Object, in radians, based on the world transform.
+     * This value is updated at the end of updateTransform and takes all parent transforms into account.
+     *
+     * @property worldRotation
+     * @type Number
+     * @readOnly
+     */
+    this.worldRotation = 0;
 
     /**
      * cached sin rotation and cos rotation
@@ -165,7 +187,7 @@ PIXI.DisplayObject = function()
      * @property filterArea
      * @type Rectangle
      */
-    this.filterArea = null;//new PIXI.Rectangle(0,0,1,1);
+    this.filterArea = null;
 
     /**
      * The original, cached bounds of the object
@@ -188,7 +210,7 @@ PIXI.DisplayObject = function()
     /**
      * The original, cached mask of the object
      *
-     * @property _currentBounds
+     * @property _mask
      * @type Rectangle
      * @private
      */
@@ -212,130 +234,47 @@ PIXI.DisplayObject = function()
      */
     this._cacheIsDirty = false;
 
-
-    /*
-     * MOUSE Callbacks
-     */
-    
-    /**
-     * A callback that is used when the users mouse rolls over the displayObject
-     * @method mouseover
-     * @param interactionData {InteractionData}
-     */
-
-    /**
-     * A callback that is used when the users mouse leaves the displayObject
-     * @method mouseout
-     * @param interactionData {InteractionData}
-     */
-
-    //Left button
-    /**
-     * A callback that is used when the users clicks on the displayObject with their mouse's left button
-     * @method click
-     * @param interactionData {InteractionData}
-     */
-
-    /**
-     * A callback that is used when the user clicks the mouse's left button down over the sprite
-     * @method mousedown
-     * @param interactionData {InteractionData}
-     */
-
-    /**
-     * A callback that is used when the user releases the mouse's left button that was over the displayObject
-     * for this callback to be fired, the mouse's left button must have been pressed down over the displayObject
-     * @method mouseup
-     * @param interactionData {InteractionData}
-     */
-
-    /**
-     * A callback that is used when the user releases the mouse's left button that was over the displayObject but is no longer over the displayObject
-     * for this callback to be fired, the mouse's left button must have been pressed down over the displayObject
-     * @method mouseupoutside
-     * @param interactionData {InteractionData}
-     */
-
-    //Right button
-    /**
-     * A callback that is used when the users clicks on the displayObject with their mouse's right button
-     * @method rightclick
-     * @param interactionData {InteractionData}
-     */
-
-    /**
-     * A callback that is used when the user clicks the mouse's right button down over the sprite
-     * @method rightdown
-     * @param interactionData {InteractionData}
-     */
-
-    /**
-     * A callback that is used when the user releases the mouse's right button that was over the displayObject
-     * for this callback to be fired the mouse's right button must have been pressed down over the displayObject
-     * @method rightup
-     * @param interactionData {InteractionData}
-     */
-
-    /**
-     * A callback that is used when the user releases the mouse's right button that was over the displayObject but is no longer over the displayObject
-     * for this callback to be fired, the mouse's right button must have been pressed down over the displayObject
-     * @method rightupoutside
-     * @param interactionData {InteractionData}
-     */
-
-    /*
-     * TOUCH Callbacks
-     */
-
-    /**
-     * A callback that is used when the users taps on the sprite with their finger
-     * basically a touch version of click
-     * @method tap
-     * @param interactionData {InteractionData}
-     */
-
-    /**
-     * A callback that is used when the user touches over the displayObject
-     * @method touchstart
-     * @param interactionData {InteractionData}
-     */
-
-    /**
-     * A callback that is used when the user releases a touch over the displayObject
-     * @method touchend
-     * @param interactionData {InteractionData}
-     */
-
-    /**
-     * A callback that is used when the user releases the touch that was over the displayObject
-     * for this callback to be fired, The touch must have started over the sprite
-     * @method touchendoutside
-     * @param interactionData {InteractionData}
-     */
 };
 
 // constructor
 PIXI.DisplayObject.prototype.constructor = PIXI.DisplayObject;
 
 /**
- * Indicates if the sprite will have touch and mouse interactivity. It is false by default
+ * Destroy this DisplayObject.
+ * Removes all references to transformCallbacks, its parent, the stage, filters, bounds, mask and cached Sprites.
  *
- * @property interactive
- * @type Boolean
- * @default false
+ * @method destroy
  */
-Object.defineProperty(PIXI.DisplayObject.prototype, 'interactive', {
-    get: function() {
-        return this._interactive;
-    },
-    set: function(value) {
-        this._interactive = value;
+PIXI.DisplayObject.prototype.destroy = function()
+{
+    if (this.children)
+    {
+        var i = this.children.length;
 
-        // TODO more to be done here..
-        // need to sort out a re-crawl!
-        if(this.stage)this.stage.dirty = true;
+        while (i--)
+        {
+            this.children[i].destroy();
+        }
+
+        this.children = [];
     }
-});
+
+    this.transformCallback = null;
+    this.transformCallbackContext = null;
+    this.hitArea = null;
+    this.parent = null;
+    this.stage = null;
+    this.worldTransform = null;
+    this.filterArea = null;
+    this._bounds = null;
+    this._currentBounds = null;
+    this._mask = null;
+
+    //  In case Pixi is still going to try and render it even though destroyed
+    this.renderable = false;
+
+    this._destroyCachedSprite();
+};
 
 /**
  * [read-only] Indicates if the sprite is globally visible.
@@ -344,18 +283,21 @@ Object.defineProperty(PIXI.DisplayObject.prototype, 'interactive', {
  * @type Boolean
  */
 Object.defineProperty(PIXI.DisplayObject.prototype, 'worldVisible', {
+
     get: function() {
+
         var item = this;
 
         do
         {
-            if(!item.visible)return false;
+            if (!item.visible) return false;
             item = item.parent;
         }
         while(item);
 
         return true;
     }
+
 });
 
 /**
@@ -367,23 +309,33 @@ Object.defineProperty(PIXI.DisplayObject.prototype, 'worldVisible', {
  * @type Graphics
  */
 Object.defineProperty(PIXI.DisplayObject.prototype, 'mask', {
+
     get: function() {
         return this._mask;
     },
+
     set: function(value) {
 
-        if(this._mask)this._mask.isMask = false;
+        if (this._mask) this._mask.isMask = false;
+
         this._mask = value;
-        if(this._mask)this._mask.isMask = true;
+
+        if (this._mask) this._mask.isMask = true;
     }
+
 });
 
 /**
  * Sets the filters for the displayObject.
- * * IMPORTANT: This is a webGL only feature and will be ignored by the canvas renderer.
- * To remove filters simply set this property to 'null'
+ * IMPORTANT: This is a webGL only feature and will be ignored by the Canvas renderer.
+ * 
+ * To remove filters simply set this property to 'null'.
+ * 
+ * You cannot have a filter and a multiply blend mode active at the same time. Setting a filter will reset
+ * this objects blend mode to NORMAL.
+ * 
  * @property filters
- * @type Array An array of filters
+ * @type Array(Filter)
  */
 Object.defineProperty(PIXI.DisplayObject.prototype, 'filters', {
 
@@ -393,13 +345,15 @@ Object.defineProperty(PIXI.DisplayObject.prototype, 'filters', {
 
     set: function(value) {
 
-        if(value)
+        if (value)
         {
             // now put all the passes in one place..
             var passes = [];
+
             for (var i = 0; i < value.length; i++)
             {
                 var filterPasses = value[i].passes;
+
                 for (var j = 0; j < filterPasses.length; j++)
                 {
                     passes.push(filterPasses[j]);
@@ -407,10 +361,15 @@ Object.defineProperty(PIXI.DisplayObject.prototype, 'filters', {
             }
 
             // TODO change this as it is legacy
-            this._filterBlock = {target:this, filterPasses:passes};
+            this._filterBlock = { target: this, filterPasses: passes };
         }
 
         this._filters = value;
+
+        if (this.blendMode && this.blendMode === PIXI.blendModes.MULTIPLY)
+        {
+            this.blendMode = PIXI.blendModes.NORMAL;
+        }
     }
 });
 
@@ -429,9 +388,12 @@ Object.defineProperty(PIXI.DisplayObject.prototype, 'cacheAsBitmap', {
 
     set: function(value) {
 
-        if(this._cacheAsBitmap === value)return;
+        if (this._cacheAsBitmap === value)
+        {
+            return;
+        }
 
-        if(value)
+        if (value)
         {
             this._generateCachedSprite();
         }
@@ -442,29 +404,51 @@ Object.defineProperty(PIXI.DisplayObject.prototype, 'cacheAsBitmap', {
 
         this._cacheAsBitmap = value;
     }
+
 });
 
 /*
- * Updates the object transform for rendering
+ * Updates the object transform for rendering.
+ *
+ * If the object has no parent, and no parent parameter is provided, it will default to Phaser.Game.World as the parent.
+ * If that is unavailable the transform fails to take place.
+ *
+ * The `parent` parameter has priority over the actual parent. Use it as a parent override.
+ * Setting it does **not** change the actual parent of this DisplayObject, it just uses the parent for the transform update.
  *
  * @method updateTransform
- * @private
+ * @param {DisplayObject} [parent] - Optional parent to parent this DisplayObject transform from.
  */
-PIXI.DisplayObject.prototype.updateTransform = function()
+PIXI.DisplayObject.prototype.updateTransform = function(parent)
 {
+    if (!parent && !this.parent && !this.game)
+    {
+        return;
+    }
+
+    var p = this.parent;
+
+    if (parent)
+    {
+        p = parent;
+    }
+    else if (!this.parent)
+    {
+        p = this.game.world;
+    }
+
     // create some matrix refs for easy access
-    var pt = this.parent.worldTransform;
+    var pt = p.worldTransform;
     var wt = this.worldTransform;
 
     // temporary matrix variables
     var a, b, c, d, tx, ty;
 
-    // TODO create a const for 2_PI 
     // so if rotation is between 0 then we can simplify the multiplication process..
-    if(this.rotation % PIXI.PI_2)
+    if (this.rotation % PIXI.PI_2)
     {
         // check to see if the rotation is the same as the previous render. This means we only need to use sin and cos when rotation actually changes
-        if(this.rotation !== this.rotationCache)
+        if (this.rotation !== this.rotationCache)
         {
             this.rotationCache = this.rotation;
             this._sr = Math.sin(this.rotation);
@@ -480,7 +464,7 @@ PIXI.DisplayObject.prototype.updateTransform = function()
         ty =  this.position.y;
         
         // check for pivot.. not often used so geared towards that fact!
-        if(this.pivot.x || this.pivot.y)
+        if (this.pivot.x || this.pivot.y)
         {
             tx -= this.pivot.x * a + this.pivot.y * c;
             ty -= this.pivot.x * b + this.pivot.y * d;
@@ -493,28 +477,44 @@ PIXI.DisplayObject.prototype.updateTransform = function()
         wt.d  = c  * pt.b + d  * pt.d;
         wt.tx = tx * pt.a + ty * pt.c + pt.tx;
         wt.ty = tx * pt.b + ty * pt.d + pt.ty;
-
-        
     }
     else
     {
         // lets do the fast version as we know there is no rotation..
         a  = this.scale.x;
         d  = this.scale.y;
+
         tx = this.position.x - this.pivot.x * a;
         ty = this.position.y - this.pivot.y * d;
 
-        wt.a  = pt.a * a;
-        wt.b  = pt.b * d;
-        wt.c  = pt.c * a;
-        wt.d  = pt.d * d;
+        wt.a  = a  * pt.a;
+        wt.b  = a  * pt.b;
+        wt.c  = d  * pt.c;
+        wt.d  = d  * pt.d;
         wt.tx = tx * pt.a + ty * pt.c + pt.tx;
         wt.ty = tx * pt.b + ty * pt.d + pt.ty;
     }
 
     // multiply the alphas..
-    this.worldAlpha = this.alpha * this.parent.worldAlpha;
+    this.worldAlpha = this.alpha * p.worldAlpha;
+
+    this.worldPosition.set(wt.tx, wt.ty);
+    this.worldScale.set(Math.sqrt(wt.a * wt.a + wt.b * wt.b), Math.sqrt(wt.c * wt.c + wt.d * wt.d));
+    this.worldRotation = Math.atan2(-wt.c, wt.d);
+
+    // reset the bounds each time this is called!
+    this._currentBounds = null;
+
+    //  Custom callback?
+    if (this.transformCallback)
+    {
+        this.transformCallback.call(this.transformCallbackContext, wt, pt);
+    }
+
 };
+
+// performance increase to avoid using call.. (10x faster)
+PIXI.DisplayObject.prototype.displayObjectUpdateTransform = PIXI.DisplayObject.prototype.updateTransform;
 
 /**
  * Retrieves the bounds of the displayObject as a rectangle object
@@ -549,7 +549,15 @@ PIXI.DisplayObject.prototype.getLocalBounds = function()
 PIXI.DisplayObject.prototype.setStageReference = function(stage)
 {
     this.stage = stage;
-    if(this._interactive)this.stage.dirty = true;
+};
+
+/**
+ * Empty, to be overridden by classes that require it.
+ *
+ * @method preUpdate
+ */
+PIXI.DisplayObject.prototype.preUpdate = function()
+{
 };
 
 /**
@@ -558,7 +566,7 @@ PIXI.DisplayObject.prototype.setStageReference = function(stage)
  *
  * @method generateTexture
  * @param resolution {Number} The resolution of the texture being generated
- * @param scaleMode {Number} Should be one of the PIXI.scaleMode consts
+ * @param scaleMode {Number} See {{#crossLink "PIXI/scaleModes:property"}}PIXI.scaleModes{{/crossLink}} for possible values
  * @param renderer {CanvasRenderer|WebGLRenderer} The renderer used to generate the texture.
  * @return {Texture} a texture of the graphics object
  */
@@ -595,7 +603,8 @@ PIXI.DisplayObject.prototype.updateCache = function()
  */
 PIXI.DisplayObject.prototype.toGlobal = function(position)
 {
-    this.updateTransform();
+    // don't need to u[date the lot
+    this.displayObjectUpdateTransform();
     return this.worldTransform.apply(position);
 };
 
@@ -614,7 +623,8 @@ PIXI.DisplayObject.prototype.toLocal = function(position, from)
         position = from.toGlobal(position);
     }
 
-    this.updateTransform();
+    // don't need to u[date the lot
+    this.displayObjectUpdateTransform();
 
     return this.worldTransform.applyInverse(position);
 };
@@ -630,7 +640,7 @@ PIXI.DisplayObject.prototype._renderCachedSprite = function(renderSession)
 {
     this._cachedSprite.worldAlpha = this.worldAlpha;
 
-    if(renderSession.gl)
+    if (renderSession.gl)
     {
         PIXI.Sprite.prototype._renderWebGL.call(this._cachedSprite, renderSession);
     }
@@ -649,31 +659,32 @@ PIXI.DisplayObject.prototype._renderCachedSprite = function(renderSession)
 PIXI.DisplayObject.prototype._generateCachedSprite = function()
 {
     this._cacheAsBitmap = false;
+
     var bounds = this.getLocalBounds();
 
-    if(!this._cachedSprite)
-    {
-        var renderTexture = new PIXI.RenderTexture(bounds.width | 0, bounds.height | 0);//, renderSession.renderer);
+    this.updateTransform();
 
+    if (!this._cachedSprite)
+    {
+        var renderTexture = new PIXI.RenderTexture(bounds.width | 1, bounds.height | 1);
         this._cachedSprite = new PIXI.Sprite(renderTexture);
         this._cachedSprite.worldTransform = this.worldTransform;
     }
     else
     {
-        this._cachedSprite.texture.resize(bounds.width | 0, bounds.height | 0);
+        this._cachedSprite.texture.resize(bounds.width | 1, bounds.height | 1);
     }
 
-    //REMOVE filter!
+    //  Remove filters
     var tempFilters = this._filters;
     this._filters = null;
-
     this._cachedSprite.filters = tempFilters;
 
+    // PIXI.DisplayObject._tempMatrix.identity();
     PIXI.DisplayObject._tempMatrix.tx = -bounds.x;
     PIXI.DisplayObject._tempMatrix.ty = -bounds.y;
-    
-    this._cachedSprite.texture.render(this, PIXI.DisplayObject._tempMatrix );
 
+    this._cachedSprite.texture.render(this, PIXI.DisplayObject._tempMatrix, true);
     this._cachedSprite.anchor.x = -( bounds.x / bounds.width );
     this._cachedSprite.anchor.y = -( bounds.y / bounds.height );
 
@@ -690,7 +701,7 @@ PIXI.DisplayObject.prototype._generateCachedSprite = function()
 */
 PIXI.DisplayObject.prototype._destroyCachedSprite = function()
 {
-    if(!this._cachedSprite)return;
+    if (!this._cachedSprite) return;
 
     this._cachedSprite.texture.destroy(true);
 
@@ -726,9 +737,6 @@ PIXI.DisplayObject.prototype._renderCanvas = function(renderSession)
     renderSession = renderSession;
 };
 
-
-PIXI.DisplayObject._tempMatrix = new PIXI.Matrix();
-
 /**
  * The position of the displayObject on the x axis relative to the local coordinates of the parent.
  *
@@ -736,12 +744,15 @@ PIXI.DisplayObject._tempMatrix = new PIXI.Matrix();
  * @type Number
  */
 Object.defineProperty(PIXI.DisplayObject.prototype, 'x', {
+
     get: function() {
         return  this.position.x;
     },
+
     set: function(value) {
         this.position.x = value;
     }
+
 });
 
 /**
@@ -751,10 +762,13 @@ Object.defineProperty(PIXI.DisplayObject.prototype, 'x', {
  * @type Number
  */
 Object.defineProperty(PIXI.DisplayObject.prototype, 'y', {
+
     get: function() {
         return  this.position.y;
     },
+
     set: function(value) {
         this.position.y = value;
     }
+
 });

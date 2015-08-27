@@ -1,13 +1,14 @@
 /**
 * @author       Richard Davey <rich@photonstorm.com>
-* @copyright    2014 Photon Storm Ltd.
+* @copyright    2015 Photon Storm Ltd.
 * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
 */
 
 /**
 * The Physics Manager is responsible for looking after all of the running physics systems.
-* Phaser supports 3 physics systems: Arcade Physics, P2 and Ninja Physics (with Box2D and Chipmunk in development)
-* Game Objects can belong to only 1 physics system, but you can have multiple systems active in a single game.
+* Phaser supports 4 physics systems: Arcade Physics, P2, Ninja Physics and Box2D via a commercial plugin.
+* 
+* Game Objects (such as Sprites) can only belong to 1 physics system, but you can have multiple systems active in a single game.
 *
 * For example you could have P2 managing a polygon-built terrain landscape that an vehicle drives over, while it could be firing bullets that use the
 * faster (due to being much simpler) Arcade Physics system.
@@ -42,12 +43,12 @@ Phaser.Physics = function (game, config) {
     this.p2 = null;
 
     /**
-    * @property {Phaser.Physics.Ninja} ninja - The N+ Ninja Physics System.
+    * @property {Phaser.Physics.Ninja} ninja - The N+ Ninja Physics system.
     */
     this.ninja = null;
 
     /**
-    * @property {Phaser.Physics.Box2D} box2d - The Box2D Physics system (to be done).
+    * @property {Phaser.Physics.Box2D} box2d - The Box2D Physics system.
     */
     this.box2d = null;
 
@@ -55,6 +56,11 @@ Phaser.Physics = function (game, config) {
     * @property {Phaser.Physics.Chipmunk} chipmunk - The Chipmunk Physics system (to be done).
     */
     this.chipmunk = null;
+
+    /**
+    * @property {Phaser.Physics.Matter} matter - The MatterJS Physics system (coming soon).
+    */
+    this.matter = null;
 
     this.parseConfig();
 
@@ -90,6 +96,12 @@ Phaser.Physics.BOX2D = 3;
 */
 Phaser.Physics.CHIPMUNK = 4;
 
+/**
+* @const
+* @type {number}
+*/
+Phaser.Physics.MATTERJS = 5;
+
 Phaser.Physics.prototype = {
 
     /**
@@ -103,7 +115,6 @@ Phaser.Physics.prototype = {
         {
             //  If Arcade isn't specified, we create it automatically if we can
             this.arcade = new Phaser.Physics.Arcade(this.game);
-            this.game.time.deltaCap = 0.2;
         }
 
         if (this.config.hasOwnProperty('ninja') && this.config['ninja'] === true && Phaser.Physics.hasOwnProperty('Ninja'))
@@ -121,18 +132,32 @@ Phaser.Physics.prototype = {
             this.box2d = new Phaser.Physics.BOX2D(this.game, this.config);
         }
 
+        if (this.config.hasOwnProperty('matter') && this.config['matter'] === true && Phaser.Physics.hasOwnProperty('Matter'))
+        {
+            this.matter = new Phaser.Physics.Matter(this.game, this.config);
+        }
+
     },
 
     /**
     * This will create an instance of the requested physics simulation.
     * Phaser.Physics.Arcade is running by default, but all others need activating directly.
+    * 
     * You can start the following physics systems:
+    * 
     * Phaser.Physics.P2JS - A full-body advanced physics system by Stefan Hedman.
     * Phaser.Physics.NINJA - A port of Metanet Softwares N+ physics system.
-    * Phaser.Physics.BOX2D and Phaser.Physics.CHIPMUNK are still in development.
+    * Phaser.Physics.BOX2D - A commercial Phaser Plugin (see http://phaser.io)
+    *
+    * Both Ninja Physics and Box2D require their respective plugins to be loaded before you can start them.
+    * They are not bundled into the core Phaser library.
+    *
+    * If the physics world has already been created (i.e. in another state in your game) then 
+    * calling startSystem will reset the physics world, not re-create it. If you need to start them again from their constructors 
+    * then set Phaser.Physics.p2 (or whichever system you want to recreate) to `null` before calling `startSystem`.
     *
     * @method Phaser.Physics#startSystem
-    * @param {number} The physics system to start.
+    * @param {number} system - The physics system to start: Phaser.Physics.ARCADE, Phaser.Physics.P2JS, Phaser.Physics.NINJA or Phaser.Physics.BOX2D.
     */
     startSystem: function (system) {
 
@@ -142,19 +167,40 @@ Phaser.Physics.prototype = {
         }
         else if (system === Phaser.Physics.P2JS)
         {
-            this.p2 = new Phaser.Physics.P2(this.game, this.config);
+            if (this.p2 === null)
+            {
+                this.p2 = new Phaser.Physics.P2(this.game, this.config);
+            }
+            else
+            {
+                this.p2.reset();
+            }
         }
-        if (system === Phaser.Physics.NINJA)
+        else if (system === Phaser.Physics.NINJA)
         {
             this.ninja = new Phaser.Physics.Ninja(this.game);
         }
-        else if (system === Phaser.Physics.BOX2D && this.box2d === null)
+        else if (system === Phaser.Physics.BOX2D)
         {
-            this.box2d = new Phaser.Physics.Box2D(this.game, this.config);
+            if (this.box2d === null)
+            {
+                this.box2d = new Phaser.Physics.Box2D(this.game, this.config);
+            }
+            else
+            {
+                this.box2d.reset();
+            }
         }
-        else if (system === Phaser.Physics.CHIPMUNK && this.chipmunk === null)
+        else if (system === Phaser.Physics.MATTERJS)
         {
-            throw new Error('The Chipmunk physics system has not been implemented yet.');
+            if (this.matter === null)
+            {
+                this.matter = new Phaser.Physics.Matter(this.game, this.config);
+            }
+            else
+            {
+                this.matter.reset();
+            }
         }
 
     },
@@ -168,6 +214,7 @@ Phaser.Physics.prototype = {
     * Phaser.Physics.P2JS - A full-body advanced physics system supporting multiple object shapes, polygon loading, contact materials, springs and constraints.
     * Phaser.Physics.NINJA - A port of Metanet Softwares N+ physics system. Advanced AABB and Circle vs. Tile collision.
     * Phaser.Physics.BOX2D - A port of https://code.google.com/p/box2d-html5
+    * Phaser.Physics.MATTER - A full-body and light-weight advanced physics system (still in development)
     * Phaser.Physics.CHIPMUNK is still in development.
     *
     * If you require more control over what type of body is created, for example to create a Ninja Physics Circle instead of the default AABB, then see the
@@ -180,8 +227,8 @@ Phaser.Physics.prototype = {
     */
     enable: function (object, system, debug) {
 
-        if (typeof system === 'undefined') { system = Phaser.Physics.ARCADE; }
-        if (typeof debug === 'undefined') { debug = false; }
+        if (system === undefined) { system = Phaser.Physics.ARCADE; }
+        if (debug === undefined) { debug = false; }
 
         if (system === Phaser.Physics.ARCADE)
         {
@@ -198,6 +245,10 @@ Phaser.Physics.prototype = {
         else if (system === Phaser.Physics.BOX2D && this.box2d)
         {
             this.box2d.enable(object);
+        }
+        else if (system === Phaser.Physics.MATTERJS && this.matter)
+        {
+            this.matter.enable(object);
         }
 
     },
@@ -222,6 +273,11 @@ Phaser.Physics.prototype = {
             this.box2d.preUpdate();
         }
 
+        if (this.matter)
+        {
+            this.matter.preUpdate();
+        }
+
     },
 
     /**
@@ -242,6 +298,11 @@ Phaser.Physics.prototype = {
         if (this.box2d)
         {
             this.box2d.update();
+        }
+
+        if (this.matter)
+        {
+            this.matter.update();
         }
 
     },
@@ -274,6 +335,11 @@ Phaser.Physics.prototype = {
             this.box2d.setBoundsToWorld();
         }
 
+        if (this.matter)
+        {
+            this.matter.setBoundsToWorld();
+        }
+
     },
 
     /**
@@ -292,6 +358,36 @@ Phaser.Physics.prototype = {
         if (this.box2d)
         {
             this.box2d.clear();
+        }
+
+        if (this.matter)
+        {
+            this.matter.clear();
+        }
+
+    },
+
+    /**
+    * Resets the active physics system. Called automatically on a Phaser.State swap.
+    *
+    * @method Phaser.Physics#reset
+    * @protected
+    */
+    reset: function () {
+
+        if (this.p2)
+        {
+            this.p2.reset();
+        }
+
+        if (this.box2d)
+        {
+            this.box2d.reset();
+        }
+
+        if (this.matter)
+        {
+            this.matter.reset();
         }
 
     },
@@ -313,10 +409,16 @@ Phaser.Physics.prototype = {
             this.box2d.destroy();
         }
 
+        if (this.matter)
+        {
+            this.matter.destroy();
+        }
+
         this.arcade = null;
         this.ninja = null;
         this.p2 = null;
         this.box2d = null;
+        this.matter = null;
 
     }
 

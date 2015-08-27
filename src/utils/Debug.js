@@ -1,6 +1,6 @@
 /**
 * @author       Richard Davey <rich@photonstorm.com>
-* @copyright    2014 Photon Storm Ltd.
+* @copyright    2015 Photon Storm Ltd.
 * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
 */
 
@@ -76,7 +76,7 @@ Phaser.Utils.Debug = function (game) {
     this.currentY = 0;
 
     /**
-    * @property {number} currentAlpha - The current alpha the debug information will be rendered at.
+    * @property {number} currentAlpha - The alpha of the Debug context, set before all debug information is rendered to it.
     * @default
     */
     this.currentAlpha = 1;
@@ -108,7 +108,7 @@ Phaser.Utils.Debug.prototype = {
             this.sprite = this.game.make.image(0, 0, this.bmd);
             this.game.stage.addChild(this.sprite);
 
-            this.canvas = Phaser.Canvas.create(this.game.width, this.game.height, '', true);
+            this.canvas = PIXI.CanvasPool.create(this, this.game.width, this.game.height);
             this.context = this.canvas.getContext('2d');
         }
 
@@ -166,12 +166,11 @@ Phaser.Utils.Debug.prototype = {
         if (typeof x !== 'number') { x = 0; }
         if (typeof y !== 'number') { y = 0; }
         color = color || 'rgb(255,255,255)';
-        if (typeof columnWidth === 'undefined') { columnWidth = 0; }
+        if (columnWidth === undefined) { columnWidth = 0; }
 
         this.currentX = x;
         this.currentY = y;
         this.currentColor = color;
-        this.currentAlpha = this.context.globalAlpha;
         this.columnWidth = columnWidth;
 
         this.dirty = true;
@@ -181,7 +180,7 @@ Phaser.Utils.Debug.prototype = {
         this.context.strokeStyle = color;
         this.context.fillStyle = color;
         this.context.font = this.font;
-        this.context.globalAlpha = 1;
+        this.context.globalAlpha = this.currentAlpha;
 
     },
 
@@ -194,7 +193,6 @@ Phaser.Utils.Debug.prototype = {
     stop: function () {
 
         this.context.restore();
-        this.context.globalAlpha = this.currentAlpha;
 
     },
 
@@ -278,6 +276,8 @@ Phaser.Utils.Debug.prototype = {
         }
 
         this.line('View x: ' + camera.view.x + ' Y: ' + camera.view.y + ' w: ' + camera.view.width + ' h: ' + camera.view.height);
+        // this.line('Screen View x: ' + camera.screenView.x + ' Y: ' + camera.screenView.y + ' w: ' + camera.screenView.width + ' h: ' + camera.screenView.height);
+        this.line('Total in view: ' + camera.totalInView);
         this.stop();
 
     },
@@ -318,7 +318,7 @@ Phaser.Utils.Debug.prototype = {
             return;
         }
 
-        if (typeof hideIfUp === 'undefined') { hideIfUp = false; }
+        if (hideIfUp === undefined) { hideIfUp = false; }
         downColor = downColor || 'rgba(0,255,0,0.5)';
         upColor = upColor || 'rgba(255,0,0,0.5)';
 
@@ -354,7 +354,7 @@ Phaser.Utils.Debug.prototype = {
         //  Render the text
         this.line('ID: ' + pointer.id + " Active: " + pointer.active);
         this.line('World X: ' + pointer.worldX + " World Y: " + pointer.worldY);
-        this.line('Screen X: ' + pointer.x + " Screen Y: " + pointer.y);
+        this.line('Screen X: ' + pointer.x + " Screen Y: " + pointer.y + " In: " + pointer.withinGame);
         this.line('Duration: ' + pointer.duration + " ms");
         this.line('is Down: ' + pointer.isDown + " is Up: " + pointer.isUp);
         this.stop();
@@ -396,7 +396,7 @@ Phaser.Utils.Debug.prototype = {
         this.start(x, y, color, 150);
 
         this.line('Key:', key.keyCode, 'isDown:', key.isDown);
-        this.line('justPressed:', key.justPressed(), 'justReleased:', key.justReleased());
+        this.line('justDown:', key.justDown, 'justUp:', key.justUp);
         this.line('Time Down:', key.timeDown.toFixed(0), 'duration:', key.duration.toFixed(0));
 
         this.stop();
@@ -441,18 +441,23 @@ Phaser.Utils.Debug.prototype = {
         this.rectangle(bounds, color, filled);
 
     },
+
     /**
-    * Renders the Rope's segments. Note: This is really expensive as it has to calculate new segments everytime you call it
+    * Renders the Rope's segments. Note: This is really expensive as it has to calculate new segments every time you call it
     *
     * @method Phaser.Utils.Debug#ropeSegments
     * @param {Phaser.Rope} rope - The rope to display the segments of.
     * @param {string} [color] - Color of the debug info to be rendered (format is css color string).
     * @param {boolean} [filled=true] - Render the rectangle as a fillRect (default, true) or a strokeRect (false)
     */
-    ropeSegments: function(rope, color, filled) {
+    ropeSegments: function (rope, color, filled) {
+
         var segments = rope.segments;
+
+        var self = this;
+
         segments.forEach(function(segment) {
-            this.rectangle(segment, color, filled);
+            self.rectangle(segment, color, filled);
         }, this);
 
     },
@@ -474,6 +479,7 @@ Phaser.Utils.Debug.prototype = {
         this.line('x: ' + sprite.x.toFixed(1) + ' y: ' + sprite.y.toFixed(1));
         this.line('angle: ' + sprite.angle.toFixed(1) + ' rotation: ' + sprite.rotation.toFixed(1));
         this.line('visible: ' + sprite.visible + ' in camera: ' + sprite.inCamera);
+        this.line('bounds x: ' + sprite._bounds.x.toFixed(1) + ' y: ' + sprite._bounds.y.toFixed(1) + ' w: ' + sprite._bounds.width.toFixed(1) + ' h: ' + sprite._bounds.height.toFixed(1));
 
         this.stop();
 
@@ -555,8 +561,8 @@ Phaser.Utils.Debug.prototype = {
     */
     geom: function (object, color, filled, forceType) {
 
-        if (typeof filled === 'undefined') { filled = true; }
-        if (typeof forceType === 'undefined') { forceType = 0; }
+        if (filled === undefined) { filled = true; }
+        if (forceType === undefined) { forceType = 0; }
 
         color = color || 'rgba(0,255,0,0.4)';
 
@@ -619,7 +625,7 @@ Phaser.Utils.Debug.prototype = {
     */
     rectangle: function (object, color, filled) {
 
-        if (typeof filled === 'undefined') { filled = true; }
+        if (filled === undefined) { filled = true; }
 
         color = color || 'rgba(0, 255, 0, 0.4)';
 
@@ -712,14 +718,14 @@ Phaser.Utils.Debug.prototype = {
     },
 
     /**
-    * Render a Sprites Physics body if it has one set. Note this only works for Arcade and
-    * Ninja (AABB, circle only) Physics.
-    * To display a P2 body you should enable debug mode on the body when creating it.
+    * Render a Sprites Physics body if it has one set. The body is rendered as a filled or stroked rectangle.
+    * This only works for Arcade Physics, Ninja Physics (AABB and Circle only) and Box2D Physics bodies.
+    * To display a P2 Physics body you should enable debug mode on the body when creating it.
     *
     * @method Phaser.Utils.Debug#body
-    * @param {Phaser.Sprite} sprite - The sprite whos body will be rendered.
-    * @param {string} [color='rgba(0,255,0,0.4)'] - color of the debug info to be rendered. (format is css color string).
-    * @param {boolean} [filled=true] - Render the objected as a filled (default, true) or a stroked (false)
+    * @param {Phaser.Sprite} sprite - The Sprite who's body will be rendered.
+    * @param {string} [color='rgba(0,255,0,0.4)'] - Color of the debug rectangle to be rendered. The format is a CSS color string such as '#ff0000' or 'rgba(255,0,0,0.5)'.
+    * @param {boolean} [filled=true] - Render the body as a filled rectangle (true) or a stroked rectangle (false)
     */
     body: function (sprite, color, filled) {
 
@@ -805,6 +811,17 @@ Phaser.Utils.Debug.prototype = {
         this.start();
         Phaser.Physics.Box2D.renderBody(this.context, body, color);
         this.stop();
+
+    },
+
+    /**
+    * Destroy this object.
+    *
+    * @method Phaser.Utils.Debug#destroy
+    */
+    destroy: function () {
+    
+        PIXI.CanvasPool.remove(this);
 
     }
 
