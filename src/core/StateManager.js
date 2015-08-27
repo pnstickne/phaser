@@ -282,7 +282,7 @@ Phaser.StateManager.prototype = {
 
             if (arguments.length > 3)
             {
-                this._args = Array.prototype.splice.call(arguments, 3);
+                this._args = Array.prototype.slice.call(arguments, 3);
             }
         }
 
@@ -308,7 +308,7 @@ Phaser.StateManager.prototype = {
 
         if (arguments.length > 2)
         {
-            this._args = Array.prototype.splice.call(arguments, 2);
+            this._args = Array.prototype.slice.call(arguments, 2);
         }
 
     },
